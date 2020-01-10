@@ -1,0 +1,25 @@
+From 3c7ba297f72b8345d7ce718556c32c1aa639a8bf Mon Sep 17 00:00:00 2001
+From: Martin Preisler <mpreisle@redhat.com>
+Date: Mon, 16 Feb 2015 18:15:29 +0100
+Subject: [PATCH] Only use QTranslator::load(QLocale(), ..) if Qt version is
+ higher than 4.8
+
+---
+ src/Application.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/Application.cpp b/src/Application.cpp
+index 1b47968..587fbeb 100644
+--- a/src/Application.cpp
++++ b/src/Application.cpp
+@@ -38,8 +38,10 @@ Application::Application(int& argc, char** argv):
+     setApplicationName("scap-workbench");
+     setApplicationVersion(SCAP_WORKBENCH_VERSION);
+ 
++#if (QT_VERSION >= QT_VERSION_CHECK(4, 8, 0))
+     mTranslator.load(QLocale(), "scap-workbench", "", getShareTranslationDirectory().absolutePath());
+     installTranslator(&mTranslator);
++#endif
+ 
+     const QIcon& icon = getApplicationIcon();
+     setWindowIcon(icon);

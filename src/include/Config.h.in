@@ -1,0 +1,52 @@
+/*
+ * Copyright 2013 Red Hat Inc., Durham, North Carolina.
+ * All Rights Reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * Authors:
+ *      Martin Preisler <mpreisle@redhat.com>
+ */
+
+#ifndef SCAP_WORKBENCH_CONFIG_H_
+#define SCAP_WORKBENCH_CONFIG_H_
+
+#define SCAP_WORKBENCH_VERSION_MAJOR @SCAP_WORKBENCH_VERSION_MAJOR@
+#define SCAP_WORKBENCH_VERSION_MINOR @SCAP_WORKBENCH_VERSION_MINOR@
+#define SCAP_WORKBENCH_VERSION_PATCH @SCAP_WORKBENCH_VERSION_PATCH@
+#define SCAP_WORKBENCH_VERSION "@SCAP_WORKBENCH_VERSION@"
+
+#define SCAP_WORKBENCH_ICON "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_DATADIR@/pixmaps/scap-workbench.png"
+#define SCAP_WORKBENCH_SHARE "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_DATADIR@/scap-workbench"
+#define SCAP_WORKBENCH_DOC "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_DOCDIR@"
+
+#define SCAP_WORKBENCH_DEFAULT_CONTENT "@SCAP_WORKBENCH_DEFAULT_CONTENT@"
+#define SCAP_WORKBENCH_SCAP_CONTENT_DIRECTORY "@SCAP_WORKBENCH_SCAP_CONTENT_DIRECTORY@"
+
+#define SCAP_WORKBENCH_LOCAL_OSCAP_PATH "oscap"
+#define SCAP_WORKBENCH_LOCAL_PKEXEC_OSCAP_PATH "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/scap-workbench-pkexec-oscap.sh"
+#define SCAP_WORKBENCH_LOCAL_RPM_EXTRACT_PATH "@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/scap-workbench-rpm-extract.sh"
+#define SCAP_WORKBENCH_REMOTE_OSCAP_PATH "oscap"
+#define SCAP_WORKBENCH_LOCAL_SSH_PATH "ssh"
+#define SCAP_WORKBENCH_LOCAL_SCP_PATH "scp"
+#define SCAP_WORKBENCH_LOCAL_SETSID_PATH "setsid"
+#define SCAP_WORKBENCH_LOCAL_NICE_PATH "nice"
+#define SCAP_WORKBENCH_LOCAL_OSCAP_NICENESS 10
+#define SCAP_WORKBENCH_LOCAL_SCAP_AS_RPM_PATH "scap-as-rpm"
+#define SCAP_WORKBENCH_LOCAL_MKTEMP "mktemp"
+#define SCAP_WORKBENCH_LOCAL_RM "rm"
+
+#cmakedefine SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
+
+#endif
