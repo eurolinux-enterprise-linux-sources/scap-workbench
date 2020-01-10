@@ -27,6 +27,7 @@
 #include <QString>
 #include <QDir>
 #include <QIcon>
+#include <QUrl>
 
 /**
  * @brief Retrieves QDir representing the share directory
@@ -63,6 +64,19 @@ const QDir& getShareDirectory();
 const QDir& getDocDirectory();
 
 /**
+ * @brief Retrieves QDir representing the SSG directory
+ *
+ * For installed scap-workbench the output's path usually looks like this:
+ * "/$INSTALL_PREFIX/share/xml/scap/ssg", e.g.: /usr/share/xml/scap/ssg
+ *
+ * Avoid using hardcoded paths in the codebase and always use paths relative
+ * to the doc path.
+ *
+ * @exception nothrow This function is guaranteed to not throw any exceptions.
+ */
+const QDir& getSSGDirectory();
+
+/**
  * @brief Constructs a QIcon from image of given filename
  *
  * This function looks for the file in the icon folder in workbench's share path.
@@ -72,6 +86,7 @@ const QDir& getDocDirectory();
  * @note This function will write a warning to stderr in case the icon cannot be loaded.
  */
 QIcon getShareIcon(const QString& fileName);
+QPixmap getSharePixmap(const QString& fileName);
 
 /**
  * @brief Retrieves the global application icon
@@ -87,5 +102,17 @@ const QIcon& getApplicationIcon();
  * @exception nothrow This function is guaranteed to not throw any exceptions.
  */
 const QDir& getShareTranslationDirectory();
+
+/**
+ * @brief Calls QDesktopServices::openUrl, shows a message box in case of failure
+ *
+ * @param url URL to open
+ */
+void openUrlGuarded(const QUrl& url);
+
+/**
+ * @brief Retrieves path to setsid
+ */
+const QString& getSetSidPath();
 
 #endif

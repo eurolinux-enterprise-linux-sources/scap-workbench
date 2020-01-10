@@ -32,13 +32,12 @@
 #include "SaveAsRPMDialog.h"
 #include "RPMOpenHelper.h"
 #include "Utils.h"
+#include "SSGIntegrationDialog.h"
 
 #include <QFileDialog>
 #include <QAbstractEventDispatcher>
-#include <QMessageBox>
 #include <QCloseEvent>
 #include <QDesktopWidget>
-#include <QDesktopServices>
 
 #include <cassert>
 #include <set>
@@ -51,10 +50,10 @@ extern "C" {
 
 // A dialog to open a tailoring file is displayed after user selects this option
 // from the tailoring combobox.
-const QString TAILORING_CUSTOM_FILE = QObject::tr("(open tailoring file...)");
+const QString TAILORING_CUSTOM_FILE = QObject::tr("(open customization file...)");
 // This option signifies that there is no tailoring being done and the plain
 // content file is used, it also resets tailoring when selected.
-const QString TAILORING_NONE = QObject::tr("(no tailoring)");
+const QString TAILORING_NONE = QObject::tr("(no customization)");
 // Signifies that tailoring changes have been made and have not been saved
 // to a file (yet?). Selecting it does nothing.
 const QString TAILORING_UNSAVED = QObject::tr("(unsaved changes)");
@@ -66,16 +65,21 @@ const QVariant TAILORING_NO_LOADED_FILE_DATA = "&*&()@#$(no loaded file)";
 MainWindow::MainWindow(QWidget* parent):
     QMainWindow(parent),
 
+    mQSettings(new QSettings(this)),
+
     mDiagnosticsDialog(0),
 
     mRPMOpenHelper(0),
+    mSkipValid(false),
     mScanningSession(0),
 
     mScanThread(0),
     mScanner(0),
 
     mOldTailoringComboBoxIdx(0),
-    mLoadedTailoringFileUserData(TAILORING_NO_LOADED_FILE_DATA)
+    mLoadedTailoringFileUserData(TAILORING_NO_LOADED_FILE_DATA),
+
+    mIgnoreProfileComboBox(false)
 {
     mUI.setupUi(this);
     mUI.progressBar->reset();
@@ -95,6 +99,14 @@ MainWindow::MainWindow(QWidget* parent):
         this, SLOT(openFileDialog())
     );
     QObject::connect(
+        mUI.actionOpenSSG, SIGNAL(triggered()),
+        this, SLOT(openSSGDialog())
+    );
+    QObject::connect(
+        mUI.actionOpenCustomizationFile, SIGNAL(triggered()),
+        this, SLOT(openCustomizationFile())
+    );
+    QObject::connect(
         mUI.checklistComboBox, SIGNAL(currentIndexChanged(int)),
         this, SLOT(checklistComboboxChanged(int))
     );
@@ -106,20 +118,48 @@ MainWindow::MainWindow(QWidget* parent):
         mUI.profileComboBox, SIGNAL(currentIndexChanged(int)),
         this, SLOT(profileComboboxChanged(int))
     );
+#ifndef SCAP_WORKBENCH_LOCAL_SCAN_ENABLED
+    mUI.localMachineRadioButton->setEnabled(false);
+    mUI.localMachineRadioButton->setToolTip(
+        QObject::tr("SCAP Workbench was compiled without local scanning support")
+    );
+    mUI.localMachineRadioButton->setChecked(false);
+# ifdef SCAP_WORKBENCH_LOCAL_SSH_FOUND
+    mUI.remoteMachineRadioButton->setChecked(true);
+# endif
+#endif
+
+#ifndef SCAP_WORKBENCH_LOCAL_SSH_FOUND
+    mUI.remoteMachineRadioButton->setEnabled(false);
+    mUI.remoteMachineRadioButton->setToolTip(
+        QObject::tr("SCAP Workbench was compiled without remote scanning support")
+    );
+#endif
+
+#ifndef SCAP_WORKBENCH_LOCAL_SCAN_ENABLED
+# ifndef SCAP_WORKBENCH_LOCAL_SSH_FOUND
+    // no scanning is possible, not remote, not local
+    mUI.scanButton->setEnabled(false);
+    mUI.scanButton->setToolTip(
+        QObject::tr("SCAP Workbench was compiled without local and remote scanning support. Only tailoring is possible.")
+    );
+# endif
+#endif
+
     QObject::connect(
-        mUI.scanButton, SIGNAL(released()),
+        mUI.scanButton, SIGNAL(clicked()),
         this, SLOT(scanAsyncAutoMode())
     );
     QObject::connect(
-        mUI.offlineRemediateButton, SIGNAL(released()),
+        mUI.offlineRemediateButton, SIGNAL(clicked()),
         this, SLOT(offlineRemediateAsync())
     );
     QObject::connect(
-        mUI.cancelButton, SIGNAL(released()),
+        mUI.cancelButton, SIGNAL(clicked()),
         this, SLOT(cancelScanAsync())
     );
     QObject::connect(
-        mUI.clearButton, SIGNAL(released()),
+        mUI.clearButton, SIGNAL(clicked()),
         this, SLOT(clearResults())
     );
 
@@ -127,19 +167,29 @@ MainWindow::MainWindow(QWidget* parent):
         mUI.actionSaveIntoDirectory, SIGNAL(triggered()),
         this, SLOT(saveIntoDirectory())
     );
-    QObject::connect(
-        mUI.actionSaveAsRPM, SIGNAL(triggered()),
-        this, SLOT(saveAsRPM())
-    );
+#ifdef SCAP_WORKBENCH_LOCAL_SCAP_AS_RPM_FOUND
+        QObject::connect(
+            mUI.actionSaveAsRPM, SIGNAL(triggered()),
+            this, SLOT(saveAsRPM())
+        );
+#else
+        mUI.actionSaveAsRPM->setEnabled(false);
+        mUI.actionSaveAsRPM->setToolTip("SCAP Workbench was compiled without Save as RPM support");
+#endif
 
     QObject::connect(
-        mUI.customizeProfileButton, SIGNAL(released()),
+        mUI.customizeProfileButton, SIGNAL(clicked()),
         this, SLOT(customizeProfile())
     );
 
     QObject::connect(
-        mUI.saveTailoringButton, SIGNAL(released()),
+        mUI.actionSaveTailoring, SIGNAL(triggered()),
         this, SLOT(saveTailoring())
+    );
+
+    QObject::connect(
+        mUI.showGuideButton, SIGNAL(released()),
+        this, SLOT(showGuide())
     );
 
     QObject::connect(
@@ -164,14 +214,12 @@ MainWindow::MainWindow(QWidget* parent):
         this, SLOT(aboutQt())
     );
 
-    mUI.ruleResultsTree->hide();
-    mUI.ruleResultsTree->header()->setResizeMode(0, QHeaderView::Stretch);
-    mUI.selectedRulesTree->show();
-    mUI.selectedRulesTree->header()->setResizeMode(0, QHeaderView::Stretch);
-
     // FIXME: This is hidden to avoid people trying to use it when it is still
     //        not supported in openscap.
     mUI.offlineRemediateButton->hide();
+    // FIXME: Hidden because tailoring isn't taken into account, this needs support
+    //        in openscap first.
+    mUI.showGuideButton->hide();
 
     mScanningSession = new ScanningSession();
 
@@ -187,7 +235,17 @@ MainWindow::~MainWindow()
     mScanner = 0;
 
     closeFile();
+
     delete mScanningSession;
+    mScanningSession = 0;
+
+    delete mQSettings;
+    mQSettings = 0;
+}
+
+void MainWindow::setSkipValid(bool skipValid)
+{
+    mSkipValid = skipValid;
 }
 
 void MainWindow::clearResults()
@@ -201,18 +259,28 @@ void MainWindow::clearResults()
     mUI.preScanTools->show();
     mUI.preScanTools->setEnabled(true);
 
-    mUI.ruleResultsTree->clear();
-    mUI.ruleResultsTree->setEnabled(false);
-
     mUI.resultViewer->clear();
-
-    mUI.ruleResultsTree->hide();
-    mUI.selectedRulesTree->show();
+    mUI.ruleResultsTree->clearResults();
+    mUI.ruleResultsTree->setEnabled(true);
 
     statusBar()->clearMessage();
 
-    mUI.progressBar->setRange(0, 1);
+    if (mScanningSession && mScanningSession->fileOpened())
+    {
+        struct xccdf_policy* policy = xccdf_session_get_xccdf_policy(mScanningSession->getXCCDFSession());
+        const int selected_rules = policy ? xccdf_policy_get_selected_rules_count(policy) : 0;
+        mUI.progressBar->setRange(0, std::max(1, selected_rules));
+        mUI.progressBar->setTextVisible(selected_rules > 0);
+    }
+    else
+    {
+        mUI.progressBar->setRange(0, 1);
+        mUI.progressBar->setTextVisible(false);
+    }
+
     mUI.progressBar->reset();
+    mUI.progressBar->setValue(0);
+    mUI.progressBar->setEnabled(true);
 
     mUI.menuSave->setEnabled(true);
     mUI.actionOpen->setEnabled(true);
@@ -232,10 +300,15 @@ void MainWindow::openFile(const QString& path)
             tailoringPath = mRPMOpenHelper->getTailoringPath();
         }
 
+        mScanningSession->setSkipValid(mSkipValid);
         mScanningSession->openFile(inputPath);
 
+        // In case openscap autonegotiated opening a tailoring file directly
+        if (tailoringPath.isEmpty() && mScanningSession->hasTailoring())
+            tailoringPath = inputPath;
+
         const QFileInfo pathInfo(path);
-        setWindowTitle(QObject::tr("%1 - scap-workbench").arg(pathInfo.fileName()));
+        setWindowTitle(QObject::tr("%1 - SCAP Workbench").arg(pathInfo.fileName()));
 
         mUI.tailoringFileComboBox->addItem(QString(TAILORING_NONE), QVariant(QString::Null()));
         mUI.tailoringFileComboBox->addItem(QString(TAILORING_CUSTOM_FILE), QVariant(QString::Null()));
@@ -261,10 +334,10 @@ void MainWindow::openFile(const QString& path)
     {
         mScanningSession->closeFile();
 
-        setWindowTitle(QObject::tr("scap-workbench"));
+        setWindowTitle(QObject::tr("SCAP Workbench"));
         mUI.tailoringFileComboBox->clear();
 
-        mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Error while opening file."));
+        mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Error while opening file."), MF_PREFORMATTED_XML);
     }
 }
 
@@ -288,7 +361,7 @@ void MainWindow::openFileDialog()
         const QString path = QFileDialog::getOpenFileName(this,
             QObject::tr("Open Source DataStream or XCCDF file"),
             defaultDirectory,
-            QObject::tr("Source DataStream, XCCDF file or SCAP RPM (*.xml *.rpm);;All files (*)"), 0
+            QObject::tr("Source DataStream, XCCDF file or SCAP RPM (*.xml *.xml.bz2 *.rpm);;All files (*)"), 0
 #ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
             , QFileDialog::DontUseNativeDialog
 #endif
@@ -300,13 +373,8 @@ void MainWindow::openFileDialog()
 
         if (fileOpened())
         {
-            if (QMessageBox::question(this, QObject::tr("Close currently opened file?"),
-                QObject::tr("Opened file has to be closed before '%1' is opened instead.\n\n"
-                            "Are you sure you want to close currently opened file?").arg(path),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
-            {
+            if (openNewFileQuestionDialog(mScanningSession->getOpenedFilePath()) == QMessageBox::Yes)
                 closeFile();
-            }
             else
                 // user cancelled closing current file, we have to abort
                 break;
@@ -329,6 +397,43 @@ void MainWindow::openFileDialog()
         if (!close())
             throw MainWindowException("Failed to close main window!");
     }
+}
+
+void MainWindow::openSSGDialog(const QString& customDismissLabel)
+{
+    if (!SSGIntegrationDialog::isSSGAvailable())
+        return;
+
+    // A diagnostic dialog might still be visible from previous failed openFile
+    // that was called because of file passed on the command line.
+    //
+    // Do not continue until user dismisses the diagnostics dialog.
+    mDiagnosticsDialog->waitUntilHidden();
+
+    SSGIntegrationDialog* dialog = new SSGIntegrationDialog(this);
+    if (!customDismissLabel.isEmpty())
+        dialog->setDismissLabel(customDismissLabel);
+
+    if (dialog->exec() == QDialog::Accepted)
+    {
+        if (fileOpened())
+        {
+            if (openNewFileQuestionDialog(mScanningSession->getOpenedFilePath()) == QMessageBox::Yes)
+            {
+                closeFile();
+            }
+            else
+            {
+                // user cancelled closing current file, we have to abort
+                delete dialog;
+                return;
+            }
+        }
+
+        openFile(dialog->getSelectedSSGFile());
+    }
+
+    delete dialog;
 }
 
 void MainWindow::openFileDialogAsync()
@@ -364,7 +469,7 @@ void MainWindow::scanAsync(ScannerMode scannerMode)
 
     clearResults();
 
-    if (getSelectedRulesCount() == 0)
+    if (mUI.ruleResultsTree->getSelectedRulesCount() == 0)
     {
         if (QMessageBox::question(this, QObject::tr("Scan with no rules selected?"),
                 QObject::tr("Chosen profile does not have any rules selected. Are you sure you want to evaluate with no rules selected?"),
@@ -384,8 +489,7 @@ void MainWindow::scanAsync(ScannerMode scannerMode)
     mUI.menuSave->setEnabled(false);
     mUI.actionOpen->setEnabled(false);
 
-    mUI.selectedRulesTree->hide();
-    mUI.ruleResultsTree->show();
+    mUI.ruleResultsTree->prepareForScanning();
 
     struct xccdf_policy* policy = xccdf_session_get_xccdf_policy(mScanningSession->getXCCDFSession());
     if (!policy)
@@ -406,9 +510,12 @@ void MainWindow::scanAsync(ScannerMode scannerMode)
         return;
     }
 
-    mUI.progressBar->setRange(0, xccdf_policy_get_selected_rules_count(policy));
+    const int selected_rules = xccdf_policy_get_selected_rules_count(policy);
+    mUI.progressBar->setRange(0, std::max(1, selected_rules));
     mUI.progressBar->reset();
+    mUI.progressBar->setValue(0);
     mUI.progressBar->setEnabled(true);
+    mUI.progressBar->setTextVisible(selected_rules > 0);
     mUI.ruleResultsTree->setEnabled(true);
 
     mScanThread = new QThread(this);
@@ -419,6 +526,7 @@ void MainWindow::scanAsync(ScannerMode scannerMode)
     const QString target = mUI.localMachineRadioButton->isChecked() ?
         "localhost" : mUI.remoteMachineDetails->getTarget();
 
+    bool fetchRemoteResources = mUI.fetchRemoteResourcesCheckbox->isChecked();
     try
     {
         //if (!mScanner || mScanner->getTarget() != target)
@@ -464,7 +572,8 @@ void MainWindow::scanAsync(ScannerMode scannerMode)
 
         mScanner->setScanThread(mScanThread);
         mScanner->setMainThread(thread());
-        mScanner->setSkipValid(mUI.actionSkipValidation->isChecked());
+        mScanner->setSkipValid(mSkipValid);
+        mScanner->setFetchRemoteResources(fetchRemoteResources);
         mScanner->setSession(mScanningSession);
         mScanner->setScannerMode(scannerMode);
 
@@ -507,6 +616,11 @@ void MainWindow::cancelScanAsync()
     emit cancelScan();
 }
 
+void MainWindow::enable()
+{
+    setEnabled(true);
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     if (mScanThread)
@@ -525,8 +639,8 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
     if (unsavedTailoringChanges())
     {
-        if (QMessageBox::question(this, QObject::tr("Unsaved tailoring changes"),
-            QObject::tr("There are unsaved tailoring changes, closing scap-workbench will destroy them. "
+        if (QMessageBox::question(this, QObject::tr("Unsaved customization changes"),
+            QObject::tr("There are unsaved customization changes, closing SCAP Workbench will destroy them. "
             "Are you sure you want to close and discard the changes?"),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::No)
         {
@@ -565,7 +679,7 @@ void MainWindow::closeFile()
 
     centralWidget()->setEnabled(false);
 
-    setWindowTitle(QObject::tr("scap-workbench"));
+    setWindowTitle(QObject::tr("SCAP Workbench"));
 
     mUI.checklistComboBox->clear();
     mUI.checklistComboBox->hide();
@@ -609,7 +723,7 @@ void MainWindow::notifyTailoringFinished(bool newProfile, bool changesConfirmed)
     }
 
     refreshProfiles();
-    refreshSelectedRulesTree();
+    mUI.ruleResultsTree->refreshSelectedRules(mScanningSession);
 
     if (changesConfirmed)
         markUnsavedTailoringChanges();
@@ -620,6 +734,8 @@ void MainWindow::refreshProfiles()
     const int previousIndex = mUI.profileComboBox->currentIndex();
     const QString previouslySelected = previousIndex == -1 ?
         QString::Null() : mUI.profileComboBox->itemData(previousIndex).toString();
+
+    mIgnoreProfileComboBox = true;
 
     mUI.profileComboBox->clear();
 
@@ -657,6 +773,9 @@ void MainWindow::refreshProfiles()
         mUI.profileComboBox->clear();
         mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Error while refreshing available XCCDF profiles."));
     }
+
+    mIgnoreProfileComboBox = false;
+    profileComboboxChanged(mUI.profileComboBox->currentIndex());
 }
 
 void MainWindow::refreshChecklists()
@@ -757,10 +876,10 @@ void MainWindow::tailoringFileComboboxChanged(int index)
         {
             if (text == TAILORING_NONE) // resets tailoring
             {
-                if (mUI.saveTailoringButton->isEnabled())
+                if (unsavedTailoringChanges())
                 {
-                    if (QMessageBox::question(this, QObject::tr("Unsaved tailoring changes!"),
-                            QObject::tr("Are you sure you want to reset tailoring and wipe all unsaved tailoring changes?"),
+                    if (QMessageBox::question(this, QObject::tr("Unsaved customization changes!"),
+                            QObject::tr("Are you sure you want to reset customization and wipe all unsaved changes?"),
                             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::No)
                     {
                         mUI.tailoringFileComboBox->setCurrentIndex(mOldTailoringComboBoxIdx); // user canceled, set to previous value
@@ -771,12 +890,14 @@ void MainWindow::tailoringFileComboboxChanged(int index)
                 mScanningSession->resetTailoring();
                 // tailoring has been reset, there are no tailoring changes to save
                 markNoUnsavedTailoringChanges();
+                // and the previously loaded tailoring file has to be removed from the combobox
+                markRemoveLoadedTailoringFile();
             }
             else if (text == TAILORING_CUSTOM_FILE) // loads custom file
             {
                 const QString filePath = QFileDialog::getOpenFileName(
-                    this, QObject::tr("Open custom XCCDF tailoring file"), QString(),
-                    QObject::tr("XCCDF tailoring file (*.xml)"), 0
+                    this, QObject::tr("Open customization (XCCDF tailoring file)"), QString(),
+                    QObject::tr("XCCDF tailoring file (*.xml *.xml.bz2)"), 0
 #ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
                     , QFileDialog::DontUseNativeDialog
 #endif
@@ -790,8 +911,8 @@ void MainWindow::tailoringFileComboboxChanged(int index)
                 else
                 {
                     if (mScanningSession->hasTailoring() &&
-                        QMessageBox::question(this, QObject::tr("Unsaved tailoring changes!"),
-                            QObject::tr("Are you sure you want to load a tailoring file and wipe all unsaved tailoring changes?"),
+                        QMessageBox::question(this, QObject::tr("Unsaved customization changes!"),
+                            QObject::tr("Are you sure you want to load a customization file and wipe all unsaved changes?"),
                             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::No)
                     {
                         mUI.tailoringFileComboBox->setCurrentIndex(mOldTailoringComboBoxIdx); // user canceled, set to previous value
@@ -812,7 +933,7 @@ void MainWindow::tailoringFileComboboxChanged(int index)
             else
             {
                 mDiagnosticsDialog->errorMessage(QString(
-                    QObject::tr("Can't set scanning session to use tailoring '%1' (from combobox "
+                    QObject::tr("Can't set scanning session to use customization '%1' (from combobox "
                     "item data). As item QVariant data was QString::Null() "
                     "'%2', '%3' or '%4' was expected as item text.")).arg(text, TAILORING_NONE, TAILORING_CUSTOM_FILE, TAILORING_UNSAVED));
             }
@@ -833,6 +954,7 @@ void MainWindow::tailoringFileComboboxChanged(int index)
 
         // We intentionally call mScanningSession->reloadSession() instead of MainWindow::reloadSession
         // because we want to catch exceptions and not have these filtered.
+        mScanningSession->setSkipValid(mSkipValid);
         mScanningSession->reloadSession();
     }
     catch (const std::exception& e)
@@ -868,6 +990,9 @@ void MainWindow::tailoringFileComboboxChanged(int index)
 
 void MainWindow::profileComboboxChanged(int index)
 {
+    if (mIgnoreProfileComboBox)
+        return;
+
     if (!fileOpened())
         return;
 
@@ -887,85 +1012,8 @@ void MainWindow::profileComboboxChanged(int index)
         mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Failed to select XCCDF profile."));
     }
 
-    refreshSelectedRulesTree();
+    mUI.ruleResultsTree->refreshSelectedRules(mScanningSession);
     clearResults();
-}
-
-/*
-Unfortunately, xccdf_policy won't let us see its "selected-final" hashmap.
-Instead we have to gather all rules and for each rule ID we check the policy.
-*/
-inline void gatherAllSelectedRules(struct xccdf_policy* policy, struct xccdf_item* current,
-    std::vector<struct xccdf_rule*>& result)
-{
-    if (xccdf_item_get_type(current) == XCCDF_RULE)
-    {
-        struct xccdf_rule* rule = xccdf_item_to_rule(current);
-        const bool selected = xccdf_policy_is_item_selected(policy, xccdf_rule_get_id(rule));
-
-        if (selected)
-            result.push_back(rule);
-    }
-    else if (xccdf_item_get_type(current) == XCCDF_BENCHMARK ||
-        xccdf_item_get_type(current) == XCCDF_GROUP)
-    {
-        struct xccdf_item_iterator* it = xccdf_item_get_content(current);
-        while (xccdf_item_iterator_has_more(it))
-        {
-            struct xccdf_item* item = xccdf_item_iterator_next(it);
-            gatherAllSelectedRules(policy, item, result);
-        }
-        xccdf_item_iterator_free(it);
-    }
-}
-
-void MainWindow::refreshSelectedRulesTree()
-{
-    mUI.selectedRulesTree->clear();
-
-    if (!fileOpened())
-        return;
-
-    struct xccdf_session* session = mScanningSession->getXCCDFSession();
-    struct xccdf_policy* policy = xccdf_session_get_xccdf_policy(session);
-
-    struct xccdf_benchmark* benchmark = 0;
-    try
-    {
-        benchmark = xccdf_policy_model_get_benchmark(xccdf_session_get_policy_model(mScanningSession->getXCCDFSession()));
-    }
-    catch (const std::exception& e)
-    {
-        // This is not a critical error, just quit
-        // FIXME: We should display some sort of an error indicator though to get bug reports!
-        return;
-    }
-
-    std::vector<struct xccdf_rule*> selectedRules;
-
-    gatherAllSelectedRules(policy, xccdf_benchmark_to_item(benchmark), selectedRules);
-
-    mUI.selectedRulesTree->setUpdatesEnabled(false);
-
-    // we filter through a set to avoid duplicates and get a sensible ordering
-    for (std::vector<struct xccdf_rule*>::const_iterator it = selectedRules.begin();
-         it != selectedRules.end(); ++it)
-    {
-        struct xccdf_rule* rule = *it;
-
-        QTreeWidgetItem* treeItem = new QTreeWidgetItem();
-        treeItem->setText(0, oscapItemGetReadableTitle((struct xccdf_item *)rule, policy));
-        treeItem->setToolTip(0, oscapItemGetReadableDescription((struct xccdf_item *)rule, policy));
-
-        mUI.selectedRulesTree->addTopLevelItem(treeItem);
-    }
-
-    mUI.selectedRulesTree->setUpdatesEnabled(true);
-}
-
-unsigned int MainWindow::getSelectedRulesCount()
-{
-    return mUI.selectedRulesTree->topLevelItemCount();
 }
 
 void MainWindow::scanProgressReport(const QString& rule_id, const QString& result)
@@ -981,137 +1029,22 @@ void MainWindow::scanProgressReport(const QString& rule_id, const QString& resul
        optimistic!
     */
 
-    assert(fileOpened());
+    if (result != "processing")
+    {
+        // Guard ourselves against multi checks, only count each rule result once
+        // for progress estimation.
+        if (!mUI.ruleResultsTree->hasRuleResult(rule_id))
+            mUI.progressBar->setValue(mUI.progressBar->value() + 1);
+    }
 
-    struct xccdf_benchmark* benchmark = 0;
-    struct xccdf_policy* policy = 0;
     try
     {
-        benchmark = xccdf_policy_model_get_benchmark(xccdf_session_get_policy_model(mScanningSession->getXCCDFSession()));
-        policy = xccdf_session_get_xccdf_policy(mScanningSession->getXCCDFSession());
+        mUI.ruleResultsTree->injectRuleResult(rule_id, result);
     }
-    catch (const std::exception& e)
+    catch (const RuleResultsTreeException& e)
     {
-        scanErrorMessage(QObject::tr("Can't get benchmark or policy from scanning session, details follow:\n%1").arg(QString::fromUtf8(e.what())));
-
-        return;
+        scanWarningMessage(e.what());
     }
-    if (!policy)
-        return;
-
-    struct xccdf_item* item = xccdf_benchmark_get_member(benchmark, XCCDF_ITEM, rule_id.toUtf8().constData());
-
-    if (!item)
-    {
-        scanWarningMessage(QString(
-            QObject::tr("Received scanning progress of rule of ID '%1'. "
-            "Rule with such ID hasn't been found in the benchmark!")).arg(rule_id));
-
-        return;
-    }
-
-    // Guard ourselves against multi checks, only count each rule result once
-    // for progress estimation.
-    if (mUI.ruleResultsTree->findItems(rule_id, Qt::MatchExactly, 0).empty())
-        mUI.progressBar->setValue(mUI.progressBar->value() + 1);
-
-    const QString preferredTitle = oscapItemGetReadableTitle(item, policy);
-    const QString preferredDesc = oscapItemGetReadableDescription(item, policy);
-
-    QString resultTooltip;
-    QBrush resultBrush;
-    if (result == "processing")
-    {
-        resultBrush.setColor(Qt::darkYellow);
-        resultTooltip = QObject::tr("This rule is currently being processed.");
-    }
-    else if (result == "pass")
-    {
-        resultBrush.setColor(Qt::darkGreen);
-        resultTooltip = QObject::tr("The target system or system component satisfied all the conditions of this rule.");
-    }
-    else if (result == "fail")
-    {
-        resultBrush.setColor(Qt::red);
-        resultTooltip = QObject::tr("The target system or system component did not satisfy every condition of this rule.");
-    }
-    else if (result == "error")
-    {
-        resultBrush.setColor(Qt::red);
-        resultTooltip = QObject::tr("The checking engine could not complete the evaluation, therefore the status of the target's "
-                "compliance with the rule is not certain. This could happen, for example, if a testing "
-                "tool was run with insufficient privileges and could not gather all of the necessary information.");
-    }
-    else if (result == "unknown")
-    {
-        resultBrush.setColor(Qt::darkGray);
-        resultTooltip = QObject::tr("The testing tool encountered some problem and the result is unknown.");
-    }
-    else if (result == "notapplicable")
-    {
-        resultBrush.setColor(Qt::darkGray);
-        resultTooltip = QObject::tr("The rule was not applicable to the target machine of the test. For example, the "
-                "rule might have been specific to a different version of the target OS, or it might "
-                "have been a test against a platform feature that was not installed.");
-    }
-    else if (result == "notchecked")
-    {
-        resultBrush.setColor(Qt::darkGray);
-        resultTooltip = QObject::tr("The rule was not evaluated by the checking engine. There were no check elements "
-                "inside the rule or none of the check systems of the check elements were supported.");
-    }
-    else if (result == "notselected")
-    {
-        resultBrush.setColor(Qt::darkGray);
-        resultTooltip = QObject::tr("The rule was not selected in the benchmark.");
-    }
-    else if (result == "informational")
-    {
-        resultBrush.setColor(Qt::darkGray);
-        resultTooltip = QObject::tr("The rule was checked, but the output from the checking engine is simply "
-                "information for auditors or administrators; it is not a compliance category.");
-    }
-    else if (result == "fixed")
-    {
-        resultBrush.setColor(Qt::darkGreen);
-        resultTooltip = QObject::tr("The rule had failed, but was then fixed (most probably using remediation).");
-    }
-    else
-        resultBrush.setColor(Qt::darkGray);
-
-    QTreeWidgetItem* treeItem = 0;
-
-    QTreeWidgetItem* replacementCandidate = mUI.ruleResultsTree->topLevelItemCount() > 0 ? mUI.ruleResultsTree->topLevelItem(mUI.ruleResultsTree->topLevelItemCount() - 1) : 0;
-    if (replacementCandidate && replacementCandidate->text(0) == preferredTitle && replacementCandidate->text(1) == QObject::tr("processing"))
-        treeItem = replacementCandidate;
-
-    if (!treeItem)
-        treeItem = new QTreeWidgetItem();
-
-    treeItem->setText(0, preferredTitle);
-    treeItem->setToolTip(0, preferredDesc);
-    treeItem->setText(1, result);
-    treeItem->setToolTip(1, resultTooltip);
-
-    treeItem->setForeground(1, resultBrush);
-
-    // Highlight currently processed rule
-    QBrush backgroundBrush(Qt::NoBrush);
-    if (result == "processing")
-        backgroundBrush = QBrush(Qt::lightGray);
-    treeItem->setBackground(0, backgroundBrush);
-    treeItem->setBackground(1, backgroundBrush);
-
-    if (treeItem != replacementCandidate)
-    {
-        // TODO: This is causing a redraw and is a massive slowdown
-        //       Ideally we would group all items that we want added
-        //       and add them at once, causing only one redraw.
-        mUI.ruleResultsTree->addTopLevelItem(treeItem);
-    }
-
-    // ensure the updated item is visible
-    mUI.ruleResultsTree->scrollToItem(treeItem);
 }
 
 void MainWindow::scanInfoMessage(const QString& message)
@@ -1153,6 +1086,7 @@ void MainWindow::scanEnded(bool canceled)
     }
     else
     {
+        mUI.progressBar->setValue(mUI.progressBar->maximum());
         mUI.resultViewer->loadContent(mScanner);
         mUI.offlineRemediateButton->setEnabled(mScanner->getScannerMode() == SM_SCAN);
     }
@@ -1172,6 +1106,15 @@ void MainWindow::scanEnded(bool canceled)
     cleanupScanThread();
 }
 
+void MainWindow::openCustomizationFile()
+{
+    int idx = mUI.tailoringFileComboBox->findText(TAILORING_CUSTOM_FILE);
+    if (idx == -1)
+        return;
+
+    mUI.tailoringFileComboBox->setCurrentIndex(idx);
+}
+
 void MainWindow::inheritAndEditProfile(bool shadowed)
 {
     if (!fileOpened())
@@ -1187,7 +1130,7 @@ void MainWindow::inheritAndEditProfile(bool shadowed)
         const bool xccdf12 = version[0].toInt() > 1 || (version[0].toInt() == 1 && version[1].toInt() >= 2);
 
         const QString newIdBase = mScanningSession->getProfile().isEmpty() ?
-            "xccdf_scap-workbench_profile_default_tailored" : mScanningSession->getProfile() +"_tailored";
+            "xccdf_scap-workbench_profile_default_customized" : mScanningSession->getProfile() +"_customized";
 
         TailorProfileDialog dialog(newIdBase, xccdf12, this);
         if (dialog.exec() == QDialog::Rejected)
@@ -1207,7 +1150,7 @@ void MainWindow::inheritAndEditProfile(bool shadowed)
     }
     catch (const std::exception& e)
     {
-        mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Failed to tailor currently selected profile."));
+        mDiagnosticsDialog->exceptionMessage(e, QObject::tr("Failed to customize currently selected profile."));
         return;
     }
 
@@ -1261,7 +1204,12 @@ TailoringWindow* MainWindow::editProfile(bool newProfile)
     struct xccdf_policy_model* policyModel = xccdf_session_get_policy_model(session);
     struct xccdf_benchmark* benchmark = xccdf_policy_model_get_benchmark(policyModel);
 
-    return new TailoringWindow(policy, benchmark, newProfile, this);
+    TailoringWindow* ret = new TailoringWindow(policy, benchmark, newProfile, this);
+#ifndef _WIN32
+    // disabling MainWindow on Windows causes workbench to hang
+    setEnabled(false);
+#endif
+    return ret;
 }
 
 void MainWindow::customizeProfile()
@@ -1277,9 +1225,11 @@ void MainWindow::customizeProfile()
 
 void MainWindow::saveTailoring()
 {
+    const QFileInfo openedFile(getOpenedFilePath());
+
     const QString path = QFileDialog::getSaveFileName(this,
-        QObject::tr("Save Tailoring As"),
-        "",
+        QObject::tr("Save Customization As"),
+        QDir(getDefaultSaveDirectory()).absoluteFilePath(QString("%1-tailoring.xml").arg(openedFile.baseName())),
         QObject::tr("XCCDF Tailoring file (*.xml)"), 0
 #ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
         , QFileDialog::DontUseNativeDialog
@@ -1289,9 +1239,12 @@ void MainWindow::saveTailoring()
     if (path.isEmpty())
         return;
 
+    notifySaveActionConfirmed(path, false);
+
     try
     {
         mScanningSession->saveTailoring(path);
+        markUnsavedTailoringChanges();
         markLoadedTailoringFile(path);
     }
     catch (const std::exception& e)
@@ -1309,7 +1262,7 @@ void MainWindow::saveIntoDirectory()
 
     const QString targetPath = QFileDialog::getExistingDirectory(this,
         QObject::tr("Select target directory"),
-        "",
+        getDefaultSaveDirectory(),
         QFileDialog::ShowDirsOnly
 #ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
         | QFileDialog::DontUseNativeDialog
@@ -1317,6 +1270,8 @@ void MainWindow::saveIntoDirectory()
     );
     if (targetPath.isEmpty())
         return; // user canceled
+
+    notifySaveActionConfirmed(targetPath, true);
 
     try
     {
@@ -1338,8 +1293,6 @@ void MainWindow::saveAsRPM()
 
 void MainWindow::markUnsavedTailoringChanges()
 {
-    mUI.saveTailoringButton->setEnabled(true);
-
     int idx = mUI.tailoringFileComboBox->findText(TAILORING_UNSAVED);
     if (idx == -1)
     {
@@ -1358,18 +1311,21 @@ void MainWindow::markUnsavedTailoringChanges()
 
 void MainWindow::markNoUnsavedTailoringChanges()
 {
-    mUI.saveTailoringButton->setEnabled(false);
-
     const int idx = mUI.tailoringFileComboBox->findText(TAILORING_UNSAVED);
+    if (idx != -1)
+        mUI.tailoringFileComboBox->removeItem(idx);
+}
+
+void MainWindow::markRemoveLoadedTailoringFile()
+{
+    const int idx = mUI.tailoringFileComboBox->findData(mLoadedTailoringFileUserData);
     if (idx != -1)
         mUI.tailoringFileComboBox->removeItem(idx);
 }
 
 void MainWindow::markLoadedTailoringFile(const QString& filePath)
 {
-    const int idx = mUI.tailoringFileComboBox->findData(mLoadedTailoringFileUserData);
-    if (idx != -1)
-        mUI.tailoringFileComboBox->removeItem(idx);
+    markRemoveLoadedTailoringFile();
 
     mLoadedTailoringFileUserData = QVariant(filePath);
     mUI.tailoringFileComboBox->addItem(filePath, mLoadedTailoringFileUserData);
@@ -1387,16 +1343,35 @@ bool MainWindow::unsavedTailoringChanges() const
     return mUI.tailoringFileComboBox->currentIndex() == idx;
 }
 
+QString MainWindow::getDefaultSaveDirectory()
+{
+    return mQSettings->value("last_save_directory", "").toString();
+}
+
+void MainWindow::notifySaveActionConfirmed(const QString& path, bool isDir)
+{
+    const QString absoluteDirPath = isDir ? path : QFileInfo(path).dir().absolutePath();
+    mQSettings->setValue("last_save_directory", absoluteDirPath);
+}
+
+void MainWindow::showGuide()
+{
+    if (!fileOpened())
+        return;
+
+    openUrlGuarded(QUrl::fromLocalFile(mScanningSession->getGuideFilePath()));
+}
+
 void MainWindow::showUserManual()
 {
-    QDesktopServices::openUrl(QUrl::fromLocalFile(getDocDirectory().absoluteFilePath("user_manual.html")));
+    openUrlGuarded(QUrl::fromLocalFile(getDocDirectory().absoluteFilePath("user_manual.html")));
 }
 
 void MainWindow::about()
 {
     const QString title = "SCAP Workbench " SCAP_WORKBENCH_VERSION;
 
-    const QString versionInfo = QString("scap-workbench %1, compiled with Qt %2, using openscap %3\n\n").arg(SCAP_WORKBENCH_VERSION, QT_VERSION_STR, oscap_get_version());
+    const QString versionInfo = QString("SCAP Workbench %1, compiled with Qt %2, using OpenSCAP %3\n\n").arg(SCAP_WORKBENCH_VERSION, QT_VERSION_STR, oscap_get_version());
     const QString description = QObject::tr(
 "This application is called SCAP Workbench, the homepage can be found at \
 <http://fedorahosted.org/scap-workbench>\n\n");
@@ -1423,4 +1398,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.\n\n");
 void MainWindow::aboutQt()
 {
     QMessageBox::aboutQt(this);
+}
+
+QMessageBox::StandardButton MainWindow::openNewFileQuestionDialog(const QString& oldFilepath)
+{
+    return QMessageBox::question(this,
+          QObject::tr("Close currently opened file?"),
+          QObject::tr("Opened file '%1' has to be closed before opening another file.\n\n"
+          "Do you want to proceed?").arg(oldFilepath),
+          QMessageBox::Yes | QMessageBox::No, QMessageBox::No
+    );
 }

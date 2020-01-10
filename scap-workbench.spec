@@ -6,31 +6,35 @@
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}-%{version}}
 
 Name:		%{?scl_prefix}scap-workbench
-Version:	1.0.3
-Release:	2%{?dist}
+Version:	1.1.1
+Release:	1%{?dist}
 Summary:	Scanning, tailoring, editing and validation tool for SCAP content
 
-License:	GPLv3+
-URL:		https://fedorahosted.org/scap-workbench/
-Source0:	https://fedorahosted.org/released/scap-workbench/%{pkg_name}-%{version}.tar.bz2
-# Upstreamed, can be removed when we rebase to 1.0.4
-Patch0:		scap-workbench-1.0.2-qtranslator.patch
-Group:		System Environment/Base
+License:    GPLv3+
+URL:        http://www.open-scap.org/tools/scap-workbench
+Source0:    https://github.com/OpenSCAP/scap-workbench/releases/download/%{version}/scap-workbench-%{version}.tar.bz2
+Group:      System Environment/Base
 
-BuildRequires:	cmake
-BuildRequires:	qt4-devel
-#BuildRequires:	qtwebkit-devel
+BuildRequires:  cmake >= 2.6
+BuildRequires:  qt4-devel >= 4.6.0
 
-BuildRequires:	%{?scl_prefix}openscap-devel >= 1.0.9
-BuildRequires:	%{?scl_prefix}openscap-utils >= 1.0.9
-Requires:		%{?scl_prefix}openscap-utils >= 1.0.9
+BuildRequires:  %{?scl_prefix}openscap-devel >= 1.2.0
+BuildRequires:  %{?scl_prefix}openscap-utils >= 1.2.0
+Requires:       %{?scl_prefix}openscap-utils >= 1.2.0
 # ssh to scan remote machines
-Requires:		openssh-clients
-Requires:		openssh-askpass
+BuildRequires:  openssh-clients
+Requires:       openssh-clients
+Requires:       openssh-askpass
 # because of 'setsid' which we use to force ssh to use GUI askpass
-Requires:		util-linux
+BuildRequires:  util-linux
+Requires:       util-linux
 # for privileged local scanning
-Requires:		polkit
+Requires:       polkit
+# default content
+Requires:       scap-security-guide
+# fonts, see https://bugzilla.redhat.com/show_bug.cgi?id=1134418
+Requires:       font(:lang=en)
+
 %{?scl:Requires: %scl_runtime}
 
 %description
@@ -39,10 +43,9 @@ content. The tool is based on OpenSCAP library.
 
 %prep
 %setup -q -n %{pkg_name}-%{version}
-%patch0 -p1
 
 %build
-%cmake -D CMAKE_INSTALL_DOCDIR=%{_pkgdocdir} -D SCAP_WORKBENCH_DEFAULT_CONTENT=/usr/share/xml/scap/ssg/content/ssg-rhel6-ds.xml .
+%cmake -D CMAKE_INSTALL_DOCDIR=%{_pkgdocdir} .
 make %{?_smp_mflags}
 
 %install
@@ -64,6 +67,10 @@ make install DESTDIR=%{buildroot}
 %doc %{_pkgdocdir}/user_manual.html
 
 %changelog
+* Tue Dec 08 2015 Martin Preisler <mpreisle@redhat.com> 1.1.1-1
+- Updated to new upstream release 1.1.1
+- Changed BuildRequires accordingly
+
 * Fri Feb 20 2015 Martin Preisler <mpreisle@redhat.com> 1.0.3-2
 - Changed default content to RHEL6 scap-security-guide source datastream
 

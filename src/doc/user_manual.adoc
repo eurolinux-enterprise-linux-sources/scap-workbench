@@ -1,10 +1,10 @@
-= SCAP workbench User Manual
+= SCAP Workbench User Manual
 :imagesdir: ./user_manual
 :toc:
 
 image::logo.svg[align="center"]
 
-scap-workbench is a tool that can open XCCDF footnote:[The Extensible
+SCAP Workbench is a tool that can open XCCDF footnote:[The Extensible
 Configuration Checklist Description Format] or SDS footnote:[Source
 DataStream] files and allows the user to evaluate either local or remote
 machine using the content in the opened file.
@@ -18,7 +18,7 @@ image::intro_screenshot.png[align="center"]
  * XCCDF 1.2 Tailoring file support
  * Evaluation of local machine
  * Evaluation of remote machine (using SSH)
- * Limited tailoring support - selection and unselection
+ * Limited tailoring support - selection, unselection and set value
  * Saving results as XCCDF 1.1 or 1.2 (depending on input) or ARF 1.1
  * Loading content bundle from RPM
  * Exporting content bundle as RPM or into a folder
@@ -29,7 +29,7 @@ image::intro_screenshot.png[align="center"]
 
  * cmake >= 2.6
  * Qt4 (Core, GUI, XmlPatterns)
- * openscap >= 1.0.9
+ * openscap >= 1.2.0
  * cmake-gui [optional]
 
 === Runtime Dependencies (workbench machine)
@@ -70,6 +70,9 @@ Even before we start the workbench we need to find content to open. Probably
 the best choice right now is scap-security-guide
 footnote:[https://fedorahosted.org/scap-security-guide/].
 
+It is possible that scap-security-guide has already been installed on your
+system as a dependency of scap-workbench. If it isn't, install it:
+
 From the package repository (YUM):: # yum install scap-security-guide
 From the package repository (APT):: # apt-get install scap-security-guide
 From upstream source (for advanced users or content developers)::
@@ -81,33 +84,41 @@ From upstream source (for advanced users or content developers)::
  * http://usgcb.nist.gov/usgcb/rhel_content.html[USGCB for RHEL5] - XCCDF and OVAL, only suitable for RHEL5.
  * https://fedorahosted.org/sce-community-content/[SCE Community Content] - Uses SCE, only suitable for Fedora.
 
-=== Start scap-workbench
+=== Start SCAP Workbench
 
-After installation a new application entry for scap-workbench should appear
+After installation a new application entry for SCAP Workbench should appear
 in your desktop environments application menu.
 
 [[img-starting-scap-workbench]]
-.scap-workbench application entry in GNOME 3
+.SCAP Workbench application entry in GNOME 3
 image::starting_scap_workbench.png[align="center"]
 
-In case you cannot find any scap-workbench application icon / entry to click,
+In case you cannot find any SCAP Workbench application icon / entry to click,
 press Alt+F2 to bring up the run command dialog (works in Gnome 3 and KDE 4),
 type 'scap-workbench' and confirm.
 
-scap-workbench should start and if you installed scap-security-guide from
-your package repository, workbench will immediately open it without any
-interaction being necessary.
+SCAP Workbench should start and if you installed scap-security-guide from
+your package repository, workbench will immediately open a dialog letting you
+choose which SSG variant you want to open.
+
+[[img-ssg-integration]]
+.SSG integration dialog
+image::ssg_integration.png[align="center"]
+
+For the remainder of this guide let us assume that you chose Fedora. All the
+instructions are similar on other variants.
 
 [[img-default-content-opened]]
-.Default content opened in workbench
+.Fedora SSG content opened in workbench
 image::default_content_opened.png[align="center"]
 
 === Open Different Content (optional)
 
-Choosing the *Open content* action from the File menu (top of the main window) will enable
+Clicking Open Other content in the SSG integration dialog or choosing the *Open Other content*
+action from the File menu (top of the main window) will enable
 you to change opened content. Keep in mind that workbench only supports opening
-XCCDF, Source DataStream or SCAP RPM files. Everything else will result in an error
-dialog being shown.
+XCCDF, Source DataStream, SCAP RPM files or their bzip2 variants. Everything else will
+result in an error dialog being shown.
 
 If your content provider ships both XCCDF and Source DataStream files you are
 better off using Source DataStream. Especially if you want to perform remote
@@ -117,16 +128,16 @@ SCAP RPM will usually contain a tailoring file, as well as input file in the for
 or Source DataStream.
 
 ****
-Only one content file can be opened by a single scap-workbench instance.
-Opening a different content file will *DESTROY* all your tailoring changes
+Only one content file can be opened by a single SCAP Workbench instance.
+Opening a different content file will *DESTROY* all your customization changes
 and you will also *LOSE* profile selection.
 
 The one content file however can contain multiple checklists if it is a datastream.
-Changing the checklist will *CHANGE* profile selection and *MAY* make your tailoring
+Changing the checklist will *CHANGE* profile selection and *MAY* make your customization
 unusable / not applicable to the newly selected checklist.
 
 As a general rule, make sure you have the right file and right checklist
-selected before proceeding to tailoring and/or profile selection.
+selected before proceeding to customization and/or profile selection.
 ****
 
 To prevent workbench from opening default content when it starts you can either
@@ -141,22 +152,21 @@ If you pass a path that is invalid or points to a file that is not valid XCCDF o
 workbench will show an error dialog and open default content automatically.
 ****
 
-=== Load a Ready-Made Tailoring File (optional)
+=== Load a Ready-Made Customization (XCCDF tailoring file) (optional)
 
 In case you have prepared or were given a tailoring file for your specific evaluation
-use-case, you can load by clicking on the *Tailoring file* combobox and selecting
-the *(open tailoring file...)* option. This will bring up a file open dialog where
-you can select your tailoring file.
+use-case, you can load by clicking on the *Customization* combobox and selecting
+the *(open customization file...)* option. This will bring up a file open dialog where
+you can select your customization file (XCCDF tailoring file).
 
 ****
-Loading a tailoring file will *DESTROY* all your tailoring changes that you
-have done either by customizing profiles or loaded from another tailoring
-file.
+Loading a customization file will *DESTROY* all your customization changes that you
+have done either by customizing profiles or loaded from another customization file.
 ****
 
 ****
-Only XCCDF 1.2 supports tailoring officially. The openscap project has an extension
-that allows tailoring files to be used with XCCDF 1.1 so scap-workbench supports
+Only XCCDF 1.2 supports tailoring officially. The OpenSCAP project has an extension
+that allows tailoring files to be used with XCCDF 1.1 so SCAP Workbench supports
 that as well. The details are out of scope of this document but keep in mind that
 tailoring of an XCCDF 1.1 file might not work with scanners other than openscap.
 ****
@@ -195,12 +205,12 @@ selection attribute equal to "true" and all their ancestor xccdf:Group selection
 attribute also being "true" are evaluated in a *(default)* profile.
 
 It depends on the content, but the *(default)* profile is unlikely to be
-the choice you want. scap-workbench will only choose it implicitly if there
+the choice you want. SCAP Workbench will only choose it implicitly if there
 are no other profiles. The first profile that is not the *(default)* profile
 will be chosen.
 
 Use the *Profile* combobox to change which profile will be used for subsequent
-evaluation. When scap-workbench is not evaluating, it previews selected rules
+evaluation. When SCAP Workbench is not evaluating, it previews selected rules
 of the current profile. This list will refresh every time you customize a profile
 or select a different one.
 
@@ -213,7 +223,7 @@ machine.
 
 Make sure your desired profile is selected and click *Customize*.
 
-In case the tailoring action will create a new profile you will be presented
+In case the *Customize* action will create a new profile you will be presented
 with a dialog that lets you choose an ID for that new profile. Choose the ID
 wisely, you may need it later.
 
@@ -222,7 +232,7 @@ wisely, you may need it later.
 image::customizing_ssg_profile.png[align="center"]
 
 A new modal window will be shown, you cannot interact with the rest of the
-application until you either confirm or discard your tailoring changes.
+application until you either confirm or discard your customization changes.
 
 In the example case, we do not care about minimum and maximum age for passwords
 and do not want the rules failing for our configuration. Let us expand the
@@ -233,13 +243,13 @@ tree until we find the offending rules and unselect them both.
 image::tailoring_dialog_opened.png[align="center"]
 
 ****
-This tailoring dialog supports undo/redo. If you accidentally make changes
+This customization dialog supports undo/redo. If you accidentally make changes
 you want to undo, press CTRL+Z or click the *Undo* button.
 
 The entire undo history can be shown by clicking on the Undo History button.
 
 Keep in mind that the undo history gets lost when you confirm or discard
-tailoring changes and the window is closed.
+customization changes and the window is closed.
 ****
 
 [[img-tailoring-undo-history]]
@@ -253,40 +263,42 @@ following example, where we set minimum password length to 14.
 .Set minimum password length to 14
 image::tailoring_set_value.png[align="center"]
 
-After desired tailoring changes are done, click *Confirm changes* to get back
+Changes to the values are applied immediately as you change the combobox or
+editbox.
+
+After desired customization changes are done, click *Confirm changes* to get back
 to the previous GUI. To undo all of the changes to the profile, click
 *Discard*. If you want to delete the profile from tailoring, click *Delete profile*.
 
-All of these options will close the tailoring window.
+All of these options will close the customization window.
 
 === Save content (optional)
 
-==== Save just the tailoring file
+==== Save just the customization file
 
-Click *Save Tailoring* and choose the destination file. Workbench saves just the
-tailored changes, which you can use with the content you opened.
+Click *File -> Save Customization Only* and choose the destination file. Workbench
+saves just the customization which you can use with the content you opened.
 
 ****
 If XCCDF version of the content is lower than 1.2 footnote:[Tailoring is not officially
 supported in XCCDF 1.1.x, the feature has been added in 1.2] workbench will create
-a file that is not compliant to the official specification! openscap and scap-workbench
+a file that is not compliant to the official specification! OpenSCAP and SCAP Workbench
 support tailoring in XCCDF 1.1.4 through an extension. Keep in mind that such content
 will work in openscap powered tools but may not work in tools from other vendors!
 ****
 
 ==== Save all content into a directory
 
-Select *Save As* from the file menu and choose *Save into a directory*. After selecting the destination
-directory, scap-workbench exports both input content and a tailoring file into the
-directory.
+Select *File -> Save All* and choose *Into a directory*. After selecting the destination
+directory SCAP Workbench exports both input content and a tailoring file there.
 
 ==== Save as RPM
 
-Select *Save As* from the file menu and choose *Save as RPM*. A dialog will pop-up asking for details regarding
+Select *File -> Save All* and choose *As RPM*. A dialog will pop-up asking for details regarding
 the RPM that will be generated. Choose the desired name of the package and leave the other
 fields at their default settings and confirm the dialog.
 
-Another dialog opens, this time asking for destination directory where scap-workbench
+Another dialog opens, this time asking for destination directory where SCAP Workbench
 will create the RPM.
 
 [[img-tailoring-dialog-opened]]
@@ -315,10 +327,10 @@ system management tool accepts the key you used.
 
 === Choose the Target Machine
 
-scap-workbench will scan *local machine* by default. However, you can also
+SCAP Workbench will scan *local machine* by default. However, you can also
 scan remote machines using SSH.
 
-To scan a remote machine, select *remote machine (over ssh)* in the *Target*
+To scan a remote machine, select *Remote Machine (over SSH)* in the *Target*
 combobox. A pair of input boxes will appear. Input the desired username and
 hostname and select the port. Username and hostname should be put into the
 first editbox in the format commonly accepted by ssh - *username@hostname*.
@@ -353,11 +365,11 @@ The success of automatic remediation greatly depends on content quality and
 could result in broken machines if not used carefully!
 ****
 
-The *Online Remediation* checkbox will do remediation as part of the evaluation
+The *Remediate* checkbox will do remediation as part of the evaluation
 itself. After evaluation is done, *oscap* will go over failed rules and attempt
-to remedy each of them.
+to remediate each of them.
 
-The rules that were remedied will show up as *fixed* in the rule result list.
+The rules that were remediated will show up as *fixed* in the rule result list.
 
 === Evaluate
 
@@ -366,7 +378,7 @@ button to proceed. If you selected a remote machine target, SSH may ask you
 for a password at this point.
 
 ****
-scap-workbench never processes your SSH password in any way. Instead an ssh
+SCAP Workbench never processes your SSH password in any way. Instead an ssh
 process is spawned which itself spawns the ssh-askpass program which asks
 for the password.
 ****
@@ -377,9 +389,9 @@ You can click *Cancel* if you wish to scan using your current permissions.
 
 ****
 If pkexec is not available or no policykit agent is running, the privilege
-escalation dialog is not shown and scap-workbench will scan using
+escalation dialog is not shown and SCAP Workbench will scan using
 your current permissions. If you need superuser permissions, you can start
-scap-workbench using sudo or as root.
+SCAP Workbench using sudo or as root.
 
  $ sudo scap-workbench
 ****
@@ -414,14 +426,14 @@ Pressing *Show Report* will open the HTML report of the evaluation in your
 internet browser.
 
 ****
-scap-workbench will open the report in the default web browser set in your
+SCAP Workbench will open the report in the default web browser set in your
 desktop environment. Make sure you have a browser installed.
 
 If nothing happens after pressing the button, check which browser is the default.
 See *System Settings -> System Info -> Default Applications* in GNOME 3 or
 *System Settings -> Default Applications* in KDE4.
 
-In case you still cannot get scap-workbench to open a browser, save the
+In case you still cannot get SCAP Workbench to open a browser, save the
 report as an HTML file on your hard drive and open it manually.
 ****
 
@@ -456,17 +468,31 @@ Scan :: Alt + S
 Clear after scanning :: Alt + C
 Show report in browser:: Alt + S
 
+== Customization vs Tailoring
+
+The XCCDF specification calls the concept of profile customization *tailoring*.
+While this word fits the concept it's generally misunderstood by users. That's why
+workbench will often use words like *Customize* or *Customization file* to
+describe tailoring. *XCCDF tailoring file* is still used for the file format itself.
+
+If you are familiar with XCCDF specification keep in mind that customization is
+the same thing as tailoring.
+
+== Options for advanced users
+
+Passing *--skip-valid* on the command line will disable all validation.
+Both while opening the files and when scanning. This option is discouraged and
+should only be used by content creators and/or people who really know what they
+are doing.
+
 == Where to Get Help?
 
 You ask for help with the application using
 
  * #openscap channel on irc.freenode.net
- * https://lists.fedorahosted.org/mailman/listinfo/scap-workbench[scap-workbench mailing list]
+ * https://www.redhat.com/mailman/listinfo/open-scap-list[openscap mailing list]
 
-It is recommended to join the https://www.redhat.com/mailman/listinfo/open-scap-list[openscap mailing list]
-as well for SCAP specific discussions.
-
-In case you have found a bug, do not hesitate to https://fedorahosted.org/scap-workbench/newticket[submit it]
-(requires a Fedora FAS account). Make sure you provide as many details as possible,
-including your distribution, architecture, openscap, scap-workbench and Qt versions
+In case you have found a bug, do not hesitate to https://github.com/OpenSCAP/scap-workbench/issues[submit it]
+(requires a GitHub account). Make sure you provide as many details as possible,
+including your distribution, architecture, OpenSCAP, SCAP Workbench and Qt versions
 and any output scap-workbench writes to stderr.

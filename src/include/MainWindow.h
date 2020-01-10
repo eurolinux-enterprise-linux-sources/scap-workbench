@@ -28,6 +28,7 @@
 #include <QMainWindow>
 #include <QThread>
 #include <QMenu>
+#include <QMessageBox>
 
 extern "C"
 {
@@ -48,6 +49,13 @@ class MainWindow : public QMainWindow
         explicit MainWindow(QWidget* parent = 0);
         virtual ~MainWindow();
 
+        inline QSettings* getQSettings()
+        {
+            return mQSettings;
+        }
+
+        void setSkipValid(bool skipValid);
+
     public slots:
         /**
          * @brief Clears everything produced during the scan
@@ -58,6 +66,8 @@ class MainWindow : public QMainWindow
          * @brief Opens a specific file
          */
         void openFile(const QString& path);
+
+        void openSSGDialog(const QString& customDismissLabel = "");
 
         /**
          * @brief Opens a file dialog and makes user select a file or exit the app
@@ -121,6 +131,13 @@ class MainWindow : public QMainWindow
          */
         void cancelScanAsync();
 
+        /**
+         * @brief calls setEnable(true)
+         *
+         * @internal Required because of signal slot mechanism binding in TailoringWindow
+         */
+        void enable();
+
     protected:
         /// reimplemented to make sure we cancel any scanning before closing the window
         virtual void closeEvent(QCloseEvent* event);
@@ -175,6 +192,9 @@ class MainWindow : public QMainWindow
         /// UI designed in Qt Designer
         Ui_MainWindow mUI;
 
+        /// QSettings for scap-workbench
+        QSettings* mQSettings;
+
         /// Qt Dialog that displays messages (errors, warnings, info)
         /// Gets shown whenever a warning or error is emitted
         DiagnosticsDialog* mDiagnosticsDialog;
@@ -182,6 +202,8 @@ class MainWindow : public QMainWindow
         /// Needed for SCAP RPM opening functionality
         RPMOpenHelper* mRPMOpenHelper;
 
+        /// If true, openscap validation is skipped
+        bool mSkipValid;
         /// This is our central point of interaction with openscap
         ScanningSession* mScanningSession;
 
@@ -196,6 +218,9 @@ class MainWindow : public QMainWindow
         /// Remembers old tailoring combobox ID in case we want to revert to it when user cancels
         int mOldTailoringComboBoxIdx;
         QVariant mLoadedTailoringFileUserData;
+
+        /// If true, the profile combobox change signal is ignored, this avoids unnecessary profile refreshes
+        bool mIgnoreProfileComboBox;
 
     signals:
         /**
@@ -228,16 +253,6 @@ class MainWindow : public QMainWindow
         /// Profile change, we simply change the profile id in the session
         void profileComboboxChanged(int index);
 
-    public slots:
-        /**
-         * @brief Refreshes the selected rules tree according to current profile
-         *
-         * Selected rules tree is just an estimate and may not match the rules
-         * that will be later evaluated by oscap. Only oscap is authoritative
-         * in which rules are evaluated!
-         */
-        void refreshSelectedRulesTree();
-
     private:
         /**
          * @brief Retrieves number of currently selected rules
@@ -248,6 +263,13 @@ class MainWindow : public QMainWindow
          * @see refreshSelectedRulesTree
          */
         unsigned int getSelectedRulesCount();
+
+        /**
+         * @brief Ask user to proceed with closing old file due to openning of new one
+         *
+         * @return user answer
+         */
+        QMessageBox::StandardButton openNewFileQuestionDialog(const QString& oldFilepath);
 
     private slots:
         /**
@@ -308,6 +330,8 @@ class MainWindow : public QMainWindow
          */
         void scanEnded(bool canceled);
 
+        void openCustomizationFile();
+
         void inheritAndEditProfile(bool shadowed);
         TailoringWindow* editProfile(bool newProfile);
 
@@ -327,8 +351,16 @@ class MainWindow : public QMainWindow
 
         void markUnsavedTailoringChanges();
         void markNoUnsavedTailoringChanges();
+        void markRemoveLoadedTailoringFile();
         void markLoadedTailoringFile(const QString& filePath);
         bool unsavedTailoringChanges() const;
+
+    public:
+        QString getDefaultSaveDirectory();
+        void notifySaveActionConfirmed(const QString& path, bool isDir);
+
+    private slots:
+        void showGuide();
 
         /**
          * @brief Users QDesktopServices to start browser and show user manual in it

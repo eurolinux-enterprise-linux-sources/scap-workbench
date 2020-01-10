@@ -123,14 +123,15 @@ void OscapScannerLocal::evaluate()
                 mScannerMode == SM_SCAN_ONLINE_REMEDIATION);
     }
 
-#if SCAP_WORKBENCH_OSCAP_LOCAL_NICENESS != 0
+    QString program = "";
+#ifdef SCAP_WORKBENCH_LOCAL_NICE_FOUND
     args.prepend(getPkexecOscapPath());
-    args.prepend(QString::number(SCAP_WORKBENCH_OSCAP_LOCAL_NICENESS));
+    args.prepend(QString::number(SCAP_WORKBENCH_LOCAL_OSCAP_NICENESS));
     args.prepend("-n");
 
-    const QString program = SCAP_WORKBENCH_LOCAL_NICE_PATH;
+    program = SCAP_WORKBENCH_LOCAL_NICE_PATH;
 #else
-    const QString program = getPkexecOscapPath();
+    program = getPkexecOscapPath();
 #endif
 
     process.start(program, args);

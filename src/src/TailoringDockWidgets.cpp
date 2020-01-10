@@ -99,6 +99,16 @@ XCCDFItemPropertiesDockWidget::XCCDFItemPropertiesDockWidget(TailoringWindow* wi
         mUI.valueComboBox, SIGNAL(editTextChanged(QString)),
         this, SLOT(valueChanged(QString))
     );
+
+    QObject::connect(
+        mUI.dependsOnValuesBrowser, SIGNAL(anchorClicked(QUrl)),
+        this, SLOT(selectValue(QUrl))
+    );
+
+    QObject::connect(
+        mUI.affectsRulesBrowser, SIGNAL(anchorClicked(QUrl)),
+        this, SLOT(selectRule(QUrl))
+    );
 }
 
 XCCDFItemPropertiesDockWidget::~XCCDFItemPropertiesDockWidget()
@@ -140,11 +150,15 @@ void XCCDFItemPropertiesDockWidget::refresh()
 
     mUI.identsLabel->hide();
     mUI.identsBrowser->hide();
+    mUI.dependsOnValuesLabel->hide();
+    mUI.dependsOnValuesBrowser->hide();
 
     mUI.valueGroupBox->hide();
     mUI.valueComboBox->clear();
     mUI.valueComboBox->setEditText("");
     mUI.valueComboBox->lineEdit()->setValidator(0);
+    mUI.affectsRulesLabel->hide();
+    mUI.affectsRulesBrowser->hide();
 
     if (mXccdfItem)
     {
@@ -210,32 +224,95 @@ void XCCDFItemPropertiesDockWidget::refresh()
 
             mUI.valueComboBox->insertSeparator(1);
             mUI.valueGroupBox->show();
+
+            {
+                bool empty = true;
+                QString html = "<ul>\n";
+
+                const std::vector<xccdf_rule*>& affectedRules = mWindow->getRulesAffectedByValue(value);
+                for (std::vector<xccdf_rule*>::const_iterator it = affectedRules.begin();
+                     it != affectedRules.end(); ++it)
+                {
+                    struct xccdf_rule* rule = *it;
+                    empty = false;
+                    html += QString("<li><a href=\"#%1\">%2</a></li>\n").arg(
+                                xccdf_rule_get_id(rule), mWindow->getXCCDFItemTitle(xccdf_rule_to_item(rule)));
+                }
+                html += "</ul>\n";
+
+                mUI.affectsRulesBrowser->setHtml(empty ? "This value doesn't seem to be affecting any rules!" : html);
+            }
+
+            mUI.affectsRulesLabel->show();
+            mUI.affectsRulesBrowser->show();
         }
         else if (xccdf_item_get_type(mXccdfItem) == XCCDF_RULE)
         {
-            bool empty = true;
-
-            QString html = "";
-            struct xccdf_ident_iterator* idents = xccdf_rule_get_idents(xccdf_item_to_rule(mXccdfItem));
-            while (xccdf_ident_iterator_has_more(idents))
             {
-                empty = false;
+                bool empty = true;
 
-                struct xccdf_ident* ident = xccdf_ident_iterator_next(idents);
-                html += QString("[<i>%1</i>] - <b>%2</b><br />").arg(
-                    QString::fromUtf8(xccdf_ident_get_system(ident)),
-                    QString::fromUtf8(xccdf_ident_get_id(ident))
-                );
+                QString html = "";
+                struct xccdf_ident_iterator* idents = xccdf_rule_get_idents(xccdf_item_to_rule(mXccdfItem));
+                while (xccdf_ident_iterator_has_more(idents))
+                {
+                    empty = false;
 
+                    struct xccdf_ident* ident = xccdf_ident_iterator_next(idents);
+                    html += QString("[<i>%1</i>] - <b>%2</b><br />").arg(
+                        QString::fromUtf8(xccdf_ident_get_system(ident)),
+                        QString::fromUtf8(xccdf_ident_get_id(ident))
+                    );
+
+                }
+                xccdf_ident_iterator_free(idents);
+
+                if (!empty)
+                {
+                    mUI.identsBrowser->setHtml(html);
+
+                    mUI.identsLabel->show();
+                    mUI.identsBrowser->show();
+                }
             }
-            xccdf_ident_iterator_free(idents);
 
-            if (!empty)
             {
-                mUI.identsBrowser->setHtml(html);
+                bool empty = true;
+                QString html = "<ul>\n";
 
-                mUI.identsLabel->show();
-                mUI.identsBrowser->show();
+                struct xccdf_check_iterator* checks = xccdf_rule_get_checks(xccdf_item_to_rule(mXccdfItem));
+                while (xccdf_check_iterator_has_more(checks))
+                {
+                    struct xccdf_check* check = xccdf_check_iterator_next(checks);
+                    struct xccdf_check_export_iterator* checkExports = xccdf_check_get_exports(check);
+                    while (xccdf_check_export_iterator_has_more(checkExports))
+                    {
+                        struct xccdf_check_export* checkExport = xccdf_check_export_iterator_next(checkExports);
+                        const QString valueId = QString::fromUtf8(xccdf_check_export_get_value(checkExport));
+                        struct xccdf_item* value = mWindow->getXCCDFItemById(valueId);
+
+                        if (xccdf_item_get_type(value) != XCCDF_VALUE)
+                        {
+                            // TODO: We expected xccdf value but got something else, warn about this?
+                            continue;
+                        }
+
+                        empty = false;
+                        html += QString("<li><a href=\"#%1\">%2 = %3</a></li>\n").arg(
+                                    valueId, mWindow->getXCCDFItemTitle(value),
+                                    mWindow->getCurrentValueValue(xccdf_item_to_value(value)));
+                    }
+                    xccdf_check_export_iterator_free(checkExports);
+                }
+                xccdf_check_iterator_free(checks);
+                html += "</ul>\n";
+
+                if (!empty)
+                {
+                    mUI.dependsOnValuesBrowser->setHtml(html);
+
+                    mUI.dependsOnValuesLabel->show();
+                    mUI.dependsOnValuesBrowser->show();
+                }
             }
         }
     }
@@ -252,4 +329,16 @@ void XCCDFItemPropertiesDockWidget::valueChanged(const QString& newValue)
     // For the unlikely case of description or title having a <sub> element dependent
     // on the value we just changed.
     refresh();
+}
+
+void XCCDFItemPropertiesDockWidget::selectValue(const QUrl& url)
+{
+    const QString id = url.fragment();
+    mWindow->changeSelectionToXCCDFItemById(id);
+}
+
+void XCCDFItemPropertiesDockWidget::selectRule(const QUrl& url)
+{
+    const QString id = url.fragment();
+    mWindow->changeSelectionToXCCDFItemById(id);
 }

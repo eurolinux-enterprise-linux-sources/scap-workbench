@@ -21,23 +21,128 @@
 
 #include "Utils.h"
 #include <iostream>
+#include <QDesktopServices>
+#include <QMessageBox>
+#include <QCoreApplication>
+
+#if defined(__APPLE__)
+inline QDir _generateShareDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cdUp();
+    dir.cd("Resources");
+    dir.cd("share");
+    dir.cd("scap-workbench");
+    return dir;
+}
+
+inline QDir _generateDocDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cdUp();
+    dir.cd("Resources");
+    dir.cd("doc");
+    return dir;
+}
+
+inline QDir _generateSSGDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cdUp();
+    dir.cd("Resources");
+    dir.cd("ssg");
+    dir.cd("content");
+    return dir;
+}
+
+inline QString _generateApplicationIconPath()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cdUp();
+    dir.cd("Resources");
+    dir.cd("share");
+    dir.cd("pixmaps");
+    return dir.absoluteFilePath("scap-workbench.png");
+}
+
+inline QString _generateSetSidPath()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    return dir.absoluteFilePath("setsid");
+}
+#elif defined(_WIN32)
+inline QDir _generateShareDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cd("share");
+    dir.cd("scap-workbench");
+    return dir;
+}
+
+inline QDir _generateDocDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cd("doc");
+    return dir;
+}
+
+inline QDir _generateSSGDir()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cd("ssg");
+    dir.cd("content");
+    return dir;
+}
+
+inline QString _generateApplicationIconPath()
+{
+    QDir dir(QCoreApplication::applicationDirPath());
+    dir.cd("share");
+    dir.cd("pixmaps");
+    return dir.absoluteFilePath("scap-workbench.png");
+}
+#endif
 
 const QDir& getShareDirectory()
 {
+#if defined(__APPLE__) || defined(_WIN32)
+    static QDir ret(_generateShareDir());
+    return ret;
+#else
     static const QString installedPath = SCAP_WORKBENCH_SHARE;
     static const QString overriddenPath = qgetenv("SCAP_WORKBENCH_SHARE");
     static QDir ret(overriddenPath.isEmpty() ? installedPath : overriddenPath);
 
     return ret;
+#endif
 }
 
 const QDir& getDocDirectory()
 {
+#if defined(__APPLE__) || defined(_WIN32)
+    static QDir ret(_generateDocDir());
+    return ret;
+#else
     static const QString installedPath = SCAP_WORKBENCH_DOC;
     static const QString overriddenPath = qgetenv("SCAP_WORKBENCH_DOC");
     static QDir ret(overriddenPath.isEmpty() ? installedPath : overriddenPath);
 
     return ret;
+#endif
+}
+
+const QDir& getSSGDirectory()
+{
+#if defined(__APPLE__) || defined(_WIN32)
+    static QDir ret(_generateSSGDir());
+    return ret;
+#else
+    static const QString installedPath = SCAP_WORKBENCH_SSG_DIRECTORY;
+    static const QString overriddenPath = qgetenv("SCAP_WORKBENCH_SSG_DIRECTORY");
+    static QDir ret(overriddenPath.isEmpty() ? installedPath : overriddenPath);
+
+    return ret;
+#endif
 }
 
 QIcon getShareIcon(const QString& fileName)
@@ -53,11 +158,29 @@ QIcon getShareIcon(const QString& fileName)
     return ret;
 }
 
+QPixmap getSharePixmap(const QString& fileName)
+{
+    const QString fullPath = getShareDirectory().absoluteFilePath(fileName);
+    const QPixmap ret(fullPath);
+
+    if (ret.isNull())
+    {
+        std::cerr << "getSharePixmap(..): Cannot create pixmap from '" << fullPath.toUtf8().constData() << "'." << std::endl;
+    }
+
+    return ret;
+}
+
 const QIcon& getApplicationIcon()
 {
+#if defined(__APPLE__) || defined(_WIN32)
+    static const QString fullPath = _generateApplicationIconPath();
+#else
     static const QString installedPath = SCAP_WORKBENCH_ICON;
     static const QString overriddenPath = qgetenv("SCAP_WORKBENCH_ICON");
     static const QString& fullPath = overriddenPath.isEmpty() ? installedPath : overriddenPath;
+#endif
+
     static const QIcon ret = QIcon(fullPath);
 
     if (ret.pixmap(1, 1).isNull())
@@ -72,4 +195,25 @@ const QDir& getShareTranslationDirectory()
 {
     static const QDir ret(getShareDirectory().absoluteFilePath("i18n"));
     return ret;
+}
+
+void openUrlGuarded(const QUrl& url)
+{
+    if (!QDesktopServices::openUrl(url))
+        QMessageBox::warning(
+            0, QObject::tr("Failed to open file in web browser!"),
+            QObject::tr("Please check that your default browser is set to something sensible. "
+                        "As a workaround, please open<br/><a href=\"%1\">%1</a><br/>manually.").arg(url.toString())
+        );
+}
+
+const QString& getSetSidPath()
+{
+#if defined(__APPLE__)
+    static QString ret(_generateSetSidPath());
+    return ret;
+#else
+    static QString ret(SCAP_WORKBENCH_LOCAL_SETSID_PATH);
+    return ret;
+#endif
 }

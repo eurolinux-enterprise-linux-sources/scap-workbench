@@ -94,7 +94,7 @@ void OscapScannerRemoteSsh::setSession(ScanningSession* session)
 
     if (!mSession->isSDS())
         throw OscapScannerRemoteSshException("You can only use source datastreams for scanning remotely! "
-            "Remote scanning using plain XCCDF and OVAL files has not been implemented in scap-workbench yet.");
+            "Remote scanning using plain XCCDF and OVAL files has not been implemented in SCAP Workbench yet.");
 }
 
 void OscapScannerRemoteSsh::evaluate()
@@ -193,7 +193,7 @@ void OscapScannerRemoteSsh::evaluate()
 
     QProcess process(this);
 
-    process.start("ssh", baseArgs + QStringList(QString("cd '%1'; " SCAP_WORKBENCH_REMOTE_OSCAP_PATH " %2").arg(workingDir).arg(sshCmd)));
+    process.start(SCAP_WORKBENCH_LOCAL_SSH_PATH, baseArgs + QStringList(QString("cd '%1'; " SCAP_WORKBENCH_REMOTE_OSCAP_PATH " %2").arg(workingDir).arg(sshCmd)));
     process.waitForStarted();
 
     if (process.state() != QProcess::Running)
@@ -290,19 +290,18 @@ QString OscapScannerRemoteSsh::copyFileOver(const QString& localPath)
     QString ret = createRemoteTemporaryFile();
 
     {
-        ScpSyncProcess proc(mSshConnection, this);
-        proc.setDirection(SD_LOCAL_TO_REMOTE);
-        proc.setLocalPath(localPath);
-        proc.setRemotePath(ret);
+        SshSyncProcess proc(mSshConnection, this);
+        proc.setStdInFile(localPath);
+        proc.setCommand("tee");
+        proc.setArguments(QStringList(ret));
         proc.setCancelRequestSource(&mCancelRequested);
-
         proc.run();
 
         if (proc.getExitCode() != 0)
         {
             emit errorMessage(
                 QObject::tr("Failed to copy '%1' over to the remote machine! "
-                            "Diagnostic info:\n%1").arg(localPath).arg(proc.getDiagnosticInfo())
+                            "Diagnostic info:\n%2").arg(localPath).arg(proc.getDiagnosticInfo())
             );
 
             mCancelRequested = true;

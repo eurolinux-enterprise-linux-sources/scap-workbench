@@ -24,6 +24,7 @@
 
 #include "ForwardDecls.h"
 #include "ProcessHelpers.h"
+#include "TemporaryDir.h"
 #include <QObject>
 
 class SshConnection : public QObject
@@ -56,6 +57,7 @@ class SshConnection : public QObject
         QString mTarget;
         unsigned short mPort;
 
+        TemporaryDir* mSocketDir;
         QString mMasterSocket;
         QProcessEnvironment mEnvironment;
 
@@ -81,38 +83,4 @@ class SshSyncProcess : public SyncProcess
         SshConnection& mSshConnection;
 };
 
-enum ScpDirection
-{
-    SD_LOCAL_TO_REMOTE,
-    SD_REMOTE_TO_LOCAL
-};
-
-class ScpSyncProcess : public SyncProcess
-{
-    Q_OBJECT
-
-    public:
-        explicit ScpSyncProcess(SshConnection& connection, QObject* parent = 0);
-        virtual ~ScpSyncProcess();
-
-        void setDirection(ScpDirection direction);
-        ScpDirection getDirection() const;
-
-        void setLocalPath(const QString& path);
-        const QString& getLocalPath() const;
-
-        void setRemotePath(const QString& path);
-        const QString& getRemotePath() const;
-
-    protected:
-        virtual QString generateFullCommand() const;
-        virtual QStringList generateFullArguments() const;
-        virtual QProcessEnvironment generateFullEnvironment() const;
-        virtual QString generateDescription() const;
-
-        ScpDirection mScpDirection;
-        QString mLocalPath;
-        QString mRemotePath;
-        SshConnection& mSshConnection;
-};
 #endif

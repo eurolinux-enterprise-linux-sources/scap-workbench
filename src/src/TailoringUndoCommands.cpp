@@ -145,10 +145,14 @@ void XCCDFItemSelectUndoCommand::undo()
 void XCCDFItemSelectUndoCommand::refreshText()
 {
     struct xccdf_item* xccdfItem = TailoringWindow::getXccdfItemFromTreeItem(mTreeItem);
+    QString title = mWindow->getXCCDFItemTitle(xccdfItem);
+    if (title.isEmpty())
+        title = QString::fromUtf8(xccdf_item_get_id(xccdfItem));
+
     if (mNewSelect)
-        setText(QObject::tr("select \"%1\"").arg(QString::fromUtf8(xccdf_item_get_id(xccdfItem))));
+        setText(QObject::tr("select \"%1\"").arg(title));
     else
-        setText(QObject::tr("unselect \"%1\"").arg(QString::fromUtf8(xccdf_item_get_id(xccdfItem))));
+        setText(QObject::tr("unselect \"%1\"").arg(title));
 }
 
 XCCDFValueChangeUndoCommand::XCCDFValueChangeUndoCommand(TailoringWindow* window, struct xccdf_value* xccdfValue, const QString& newValue, const QString& oldValue):
@@ -198,5 +202,37 @@ void XCCDFValueChangeUndoCommand::undo()
 
 void XCCDFValueChangeUndoCommand::refreshText()
 {
-    setText(QObject::tr("set value '%1' to '%2'").arg(xccdf_value_get_id(mXccdfValue)).arg(mNewValue));
+    QString title = mWindow->getXCCDFItemTitle(xccdf_value_to_item(mXccdfValue));
+    if (title.isEmpty())
+        title = QString::fromUtf8(xccdf_value_get_id(mXccdfValue));
+
+    setText(QObject::tr("set value '%1' to '%2'").arg(title, mNewValue));
+}
+
+MacroProgressUndoCommand::MacroProgressUndoCommand(bool end):
+    mEnd(end)
+{}
+
+MacroProgressUndoCommand::~MacroProgressUndoCommand()
+{}
+
+int MacroProgressUndoCommand::id() const
+{
+    return 5;
+}
+
+void MacroProgressUndoCommand::redo()
+{
+    if (mEnd)
+        QApplication::restoreOverrideCursor();
+    else
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+}
+
+void MacroProgressUndoCommand::undo()
+{
+    if (mEnd)
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+    else
+        QApplication::restoreOverrideCursor();
 }

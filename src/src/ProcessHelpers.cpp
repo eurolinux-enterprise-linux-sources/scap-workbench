@@ -169,8 +169,8 @@ void SyncProcess::run()
 
     mRunning = false;
 
-    mStdOutContents = process.readAllStandardOutput();
-    mStdErrContents = process.readAllStandardError();
+    mStdOutContents = QString::fromLocal8Bit(process.readAllStandardOutput());
+    mStdErrContents = QString::fromLocal8Bit(process.readAllStandardError());
 
     // TODO: We are duplicating data here!
     mDiagnosticInfo += "stdout:\n===============================\n" + QString(mStdOutContents) + QString("\n");
@@ -267,6 +267,19 @@ bool SyncProcess::isRunning() const
     return mRunning;
 }
 
+void SyncProcess::setStdInFile(const QString& path)
+{
+    if (isRunning())
+        throw SyncProcessException("Can't set stdin file when the process is running!");
+
+    mStdInFile = path;
+}
+
+const QString& SyncProcess::getStdInFile() const
+{
+    return mStdInFile;
+}
+
 int SyncProcess::getExitCode() const
 {
     if (isRunning())
@@ -305,9 +318,11 @@ void SyncProcess::startQProcess(QProcess& process)
     if (command.isEmpty())
         throw SyncProcessException("Cannot start process '" + generateDescription() + "'. The full command is '" + command + "'.");
 
+    if (!mStdInFile.isEmpty())
+        process.setStandardInputFile(mStdInFile);
+
     process.setProcessEnvironment(generateFullEnvironment());
     mDiagnosticInfo += QObject::tr("Starting process '%1'\n").arg(generateDescription());
-    process.setStandardInputFile("/dev/null");
     process.setWorkingDirectory(mWorkingDirectory);
     process.start(command, generateFullArguments());
     process.waitForStarted();
