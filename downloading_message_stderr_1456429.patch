@@ -1,0 +1,34 @@
+From 4ec979148e75747b4ad1a1a2e11871520780550d Mon Sep 17 00:00:00 2001
+From: Wesley Ceraso Prudencio <wcerasop@redhat.com>
+Date: Tue, 30 May 2017 17:12:26 +0200
+Subject: [PATCH] Reads "Downloading ..." message from stderr
+
+Signed-off-by: Wesley Ceraso Prudencio <wcerasop@redhat.com>
+---
+ src/OscapScannerBase.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/OscapScannerBase.cpp b/src/OscapScannerBase.cpp
+index 968e40d..86ca23c 100644
+--- a/src/OscapScannerBase.cpp
++++ b/src/OscapScannerBase.cpp
+@@ -306,6 +306,7 @@ bool OscapScannerBase::tryToReadStdOutChar(QProcess& process)
+         {
+             case RS_READING_PREFIX:
+                 {
++                    // Openscap <= 1.2.10 (60fb9f0c98eee) sends this message through stdout
+                     if (mReadBuffer=="Downloading")
+                     {
+                          mReadingState = RS_READING_DOWNLOAD_FILE;
+@@ -435,6 +436,11 @@ void OscapScannerBase::watchStdErr(QProcess& process)
+                 QString guiMessage = guiFriendlyMessage(stdErrOutput);
+                 emit warningMessage(QObject::tr(guiMessage.toUtf8().constData()));
+             }
++            // Openscap >= 1.2.11 (60fb9f0c98eee) sends this message through stderr
++            else if (stdErrOutput.contains(QRegExp("^Downloading: .+ \\.{3} \\w+\\n")))
++            {
++                emit infoMessage(stdErrOutput);
++            }
+             else
+             {
+                 emit errorMessage(QObject::tr("The 'oscap' process has written the following content to stderr:\n"
