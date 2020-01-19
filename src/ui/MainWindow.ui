@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>850</height>
+    <height>650</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -24,10 +24,58 @@
     <item>
      <widget class="QWidget" name="scanProperties" native="true">
       <layout class="QGridLayout" name="gridLayout">
-       <item row="6" column="2">
+       <item row="4" column="2">
+        <widget class="QPushButton" name="saveTailoringButton">
+         <property name="text">
+          <string>Save Tailoring</string>
+         </property>
+         <property name="shortcut">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QComboBox" name="profileComboBox"/>
+       </item>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Input file</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QComboBox" name="tailoringFileComboBox"/>
+       </item>
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="openedFileLineEdit">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+           <weight>75</weight>
+           <bold>true</bold>
+           <strikeout>false</strikeout>
+           <kerning>true</kerning>
+          </font>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="frame">
+          <bool>false</bool>
+         </property>
+         <property name="cursorPosition">
+          <number>0</number>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="2">
         <widget class="QPushButton" name="customizeProfileButton">
          <property name="toolTip">
-          <string>Duplicates the current profile, and opens a window to customize it.</string>
+          <string>Creates a new profile that inherits selected profile, opens a window to edit the newly created profile.</string>
          </property>
          <property name="text">
           <string>Customize</string>
@@ -37,279 +85,220 @@
          </property>
         </widget>
        </item>
-       <item row="7" column="0" colspan="3">
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Tailoring</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1" colspan="2">
+        <widget class="QComboBox" name="checklistComboBox"/>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Target</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="checklistLabel">
+         <property name="text">
+          <string>Checklist</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Profile</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="browseButton">
+         <property name="text">
+          <string>&amp;Browse</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0" colspan="3">
         <widget class="Line" name="line_2">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
         </widget>
        </item>
-       <item row="2" column="1" colspan="2">
-        <widget class="QComboBox" name="checklistComboBox">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="label_3">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Profile</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="checklistLabel">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Checklist</string>
-         </property>
-        </widget>
-       </item>
-       <item row="10" column="0">
-        <widget class="QLabel" name="label">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Target</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Customization</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="1">
-        <widget class="QComboBox" name="profileComboBox">
-         <property name="toolTip">
-          <string>Determines which XCCDF profile will be used for evaluation. Listed profiles come from the input content and customization file.</string>
-         </property>
-         <property name="maxVisibleItems">
-          <number>15</number>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1" colspan="2">
-        <widget class="QLabel" name="titleLabel">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>12</pointsize>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="toolTip">
-          <string>TItle of the XCCDF Benchmark</string>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="label_5">
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Title</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1">
-        <spacer name="horizontalSpacer_2">
+       <item row="2" column="0" colspan="3">
+        <widget class="Line" name="line">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>1</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="5" column="1" colspan="2">
-        <widget class="QComboBox" name="tailoringFileComboBox">
-         <property name="toolTip">
-          <string>Allows to select, load or reset a customization. Customization is called XCCDF Tailoring in the specification.</string>
-         </property>
         </widget>
        </item>
-       <item row="10" column="1" colspan="2">
-        <widget class="QWidget" name="widget_4" native="true">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <layout class="QHBoxLayout" name="horizontalLayout_5">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
+       <item row="7" column="1" colspan="2">
+        <widget class="QWidget" name="widget_3" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <property name="margin">
            <number>0</number>
           </property>
           <item>
-           <widget class="QRadioButton" name="localMachineRadioButton">
-            <property name="toolTip">
-             <string>Selecting the Local Machine target will cause workbench to evaluate the same machine that it is running on.</string>
-            </property>
-            <property name="text">
-             <string>Local Machine</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
+           <widget class="QWidget" name="widget_4" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_5">
+             <property name="margin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QRadioButton" name="localMachineRadioButton">
+               <property name="text">
+                <string>local machine</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QRadioButton" name="remoteMachineRadioButton">
+               <property name="text">
+                <string>remote machine (over ssh)</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
           <item>
-           <widget class="QRadioButton" name="remoteMachineRadioButton">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="toolTip">
-             <string>The Remote Machine target enables workbench to scan any remote machine that can be accessed using SSH.</string>
-            </property>
-            <property name="text">
-             <string>Remote Machine (over SSH)</string>
-            </property>
+           <widget class="QWidget" name="remoteMachineDetails" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_6">
+             <property name="margin">
+              <number>0</number>
+             </property>
+             <item>
+              <widget class="QLineEdit" name="remoteMachineHost">
+               <property name="toolTip">
+                <string>Use the format commonly accepted by ssh (username@host)</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label_6">
+               <property name="font">
+                <font>
+                 <pointsize>12</pointsize>
+                 <weight>75</weight>
+                 <bold>true</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QSpinBox" name="remoteMachinePort">
+               <property name="toolTip">
+                <string>Port number</string>
+               </property>
+               <property name="minimum">
+                <number>1</number>
+               </property>
+               <property name="maximum">
+                <number>65535</number>
+               </property>
+               <property name="value">
+                <number>22</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </widget>
           </item>
          </layout>
-        </widget>
-       </item>
-       <item row="11" column="0" colspan="3">
-        <widget class="RemoteMachineComboBox" name="remoteMachineDetails" native="true">
-         <property name="focusPolicy">
-          <enum>Qt::StrongFocus</enum>
-         </property>
         </widget>
        </item>
       </layout>
      </widget>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="ruleResults">
-      <property name="leftMargin">
-       <number>9</number>
-      </property>
-      <property name="rightMargin">
-       <number>9</number>
-      </property>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_6">
-        <item>
-         <widget class="QLabel" name="label_2">
-          <property name="font">
-           <font>
-            <weight>75</weight>
-            <bold>true</bold>
-           </font>
-          </property>
+     <widget class="QWidget" name="widget_2" native="true">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QTreeWidget" name="selectedRulesTree">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="rootIsDecorated">
+          <bool>false</bool>
+         </property>
+         <column>
           <property name="text">
-           <string>Rules</string>
+           <string>Selected Rules</string>
           </property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="horizontalSpacer_5">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-        <item>
-         <widget class="QPushButton" name="expandRulesButton">
+         </column>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTreeWidget" name="ruleResultsTree">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="alternatingRowColors">
+          <bool>true</bool>
+         </property>
+         <property name="rootIsDecorated">
+          <bool>false</bool>
+         </property>
+         <property name="uniformRowHeights">
+          <bool>true</bool>
+         </property>
+         <property name="sortingEnabled">
+          <bool>false</bool>
+         </property>
+         <attribute name="headerDefaultSectionSize">
+          <number>150</number>
+         </attribute>
+         <attribute name="headerStretchLastSection">
+          <bool>false</bool>
+         </attribute>
+         <column>
           <property name="text">
-           <string>Expand All</string>
+           <string>Rule</string>
           </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <widget class="RuleResultsTree" name="ruleResultsTree" native="true">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="focusPolicy">
-         <enum>Qt::TabFocus</enum>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QProgressBar" name="progressBar">
-        <property name="maximum">
-         <number>1</number>
-        </property>
-        <property name="value">
-         <number>0</number>
-        </property>
-        <property name="format">
-         <string>%p% (%v results, %m rules selected)</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+         </column>
+         <column>
+          <property name="text">
+           <string>Result</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QProgressBar" name="progressBar">
+      <property name="maximum">
+       <number>1</number>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+      <property name="format">
+       <string>%p% (%v results, %m rules selected)</string>
+      </property>
+     </widget>
     </item>
     <item>
      <widget class="QWidget" name="widget" native="true">
@@ -321,92 +310,52 @@
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
+        <widget class="QPushButton" name="saveButton">
+         <property name="text">
+          <string>Save content</string>
+         </property>
+         <property name="shortcut">
+          <string>Ctrl+S</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>211</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
         <widget class="QWidget" name="widget_5" native="true">
          <layout class="QVBoxLayout" name="verticalLayout_3">
-          <property name="leftMargin">
-           <number>0</number>
-          </property>
-          <property name="topMargin">
-           <number>0</number>
-          </property>
-          <property name="rightMargin">
-           <number>0</number>
-          </property>
-          <property name="bottomMargin">
+          <property name="margin">
            <number>0</number>
           </property>
           <item>
            <widget class="QWidget" name="preScanTools" native="true">
             <layout class="QHBoxLayout" name="horizontalLayout">
-             <property name="leftMargin">
+             <property name="margin">
               <number>0</number>
              </property>
-             <property name="topMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>0</number>
-             </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <item>
-              <widget class="QPushButton" name="showGuideButton">
-               <property name="text">
-                <string>Show Guide</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="genRemediationButton">
-               <property name="toolTip">
-                <string>Generate remediation role that contains fix for every single rule the in the profile. Note that not every rule implements a fix.</string>
-               </property>
-               <property name="text">
-                <string>Generate remediation role</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>211</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="dryRunCheckBox">
-               <property name="toolTip">
-                <string>When checked no action is performed after pressing Scan, a dialog with the used command-line arguments is shown instead.</string>
-               </property>
-               <property name="text">
-                <string>Dry run</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QCheckBox" name="fetchRemoteResourcesCheckbox">
-               <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow download of&amp;nbsp;remote OVAL content referenced from&amp;nbsp;XCCDF by&amp;nbsp;check-content-ref/@href.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-               </property>
-               <property name="text">
-                <string>Fetch remote resources</string>
-               </property>
-              </widget>
-             </item>
              <item>
               <widget class="QCheckBox" name="onlineRemediationCheckBox">
+               <property name="font">
+                <font>
+                 <pointsize>11</pointsize>
+                </font>
+               </property>
                <property name="toolTip">
-                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Attempts to automatically correct issues identified by the scan.&lt;/p&gt;&lt;p&gt;Note: Automated remediation may impact system functionality.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                <string>Checking this enables online remediation of failed checks. Online in the sense of being done as part of the evaluation.</string>
                </property>
                <property name="text">
-                <string>Remediate</string>
+                <string>Online Remediation</string>
                </property>
               </widget>
              </item>
@@ -414,13 +363,10 @@
               <widget class="QPushButton" name="scanButton">
                <property name="font">
                 <font>
-                 <pointsize>18</pointsize>
+                 <pointsize>13</pointsize>
                  <weight>75</weight>
                  <bold>true</bold>
                 </font>
-               </property>
-               <property name="toolTip">
-                <string>Starts the evaluation.</string>
                </property>
                <property name="text">
                 <string>&amp;Scan</string>
@@ -433,31 +379,9 @@
           <item>
            <widget class="QWidget" name="scanTools" native="true">
             <layout class="QHBoxLayout" name="horizontalLayout_4">
-             <property name="leftMargin">
+             <property name="margin">
               <number>0</number>
              </property>
-             <property name="topMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>0</number>
-             </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <item>
-              <spacer name="horizontalSpacer_4">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
              <item>
               <widget class="QPushButton" name="cancelButton">
                <property name="font">
@@ -466,9 +390,6 @@
                  <weight>75</weight>
                  <bold>true</bold>
                 </font>
-               </property>
-               <property name="toolTip">
-                <string>Cancels the evaluation. Partial results may be lost.</string>
                </property>
                <property name="text">
                 <string>Cancel</string>
@@ -484,40 +405,15 @@
           <item>
            <widget class="QWidget" name="postScanTools" native="true">
             <layout class="QHBoxLayout" name="horizontalLayout_3">
-             <property name="leftMargin">
+             <property name="margin">
               <number>0</number>
              </property>
-             <property name="topMargin">
-              <number>0</number>
-             </property>
-             <property name="rightMargin">
-              <number>0</number>
-             </property>
-             <property name="bottomMargin">
-              <number>0</number>
-             </property>
-             <item>
-              <spacer name="horizontalSpacer_3">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>40</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
              <item>
               <widget class="QPushButton" name="clearButton">
                <property name="font">
                 <font>
                  <pointsize>13</pointsize>
                 </font>
-               </property>
-               <property name="toolTip">
-                <string>Causes workbench to forget all collected evaluation results and prepares it for another scan.</string>
                </property>
                <property name="text">
                 <string>&amp;Clear</string>
@@ -546,7 +442,18 @@
               </widget>
              </item>
              <item>
-              <widget class="ResultViewer" name="resultViewer" native="true"/>
+              <widget class="QPushButton" name="showResultsButton">
+               <property name="font">
+                <font>
+                 <pointsize>13</pointsize>
+                 <weight>50</weight>
+                 <bold>false</bold>
+                </font>
+               </property>
+               <property name="text">
+                <string>&amp;Report</string>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -560,159 +467,7 @@
    </layout>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
-  <widget class="QMenuBar" name="menuBar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>29</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>12</pointsize>
-    </font>
-   </property>
-   <property name="defaultUp">
-    <bool>false</bool>
-   </property>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>&amp;File</string>
-    </property>
-    <widget class="QMenu" name="menuSave">
-     <property name="title">
-      <string>Save &amp;All</string>
-     </property>
-     <addaction name="actionSaveIntoDirectory"/>
-     <addaction name="actionSaveAsRPM"/>
-    </widget>
-    <addaction name="actionOpenSSG"/>
-    <addaction name="actionOpen"/>
-    <addaction name="separator"/>
-    <addaction name="actionOpenCustomizationFile"/>
-    <addaction name="separator"/>
-    <addaction name="actionSaveTailoring"/>
-    <addaction name="menuSave"/>
-    <addaction name="separator"/>
-    <addaction name="actionQuit"/>
-   </widget>
-   <widget class="QMenu" name="menuHelp">
-    <property name="title">
-     <string>&amp;Help</string>
-    </property>
-    <addaction name="actionUserManual"/>
-    <addaction name="separator"/>
-    <addaction name="actionShowDiagnostics"/>
-    <addaction name="separator"/>
-    <addaction name="actionAbout"/>
-    <addaction name="actionAboutQt"/>
-   </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuHelp"/>
-  </widget>
-  <action name="actionOpen">
-   <property name="text">
-    <string>&amp;Open Other Content</string>
-   </property>
-   <property name="shortcutContext">
-    <enum>Qt::ApplicationShortcut</enum>
-   </property>
-  </action>
-  <action name="actionQuit">
-   <property name="text">
-    <string>&amp;Quit</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Q</string>
-   </property>
-  </action>
-  <action name="actionAbout">
-   <property name="text">
-    <string>About SCAP Workbench</string>
-   </property>
-  </action>
-  <action name="actionUserManual">
-   <property name="text">
-    <string>User Manual</string>
-   </property>
-  </action>
-  <action name="actionSaveIntoDirectory">
-   <property name="text">
-    <string>Into a &amp;directory</string>
-   </property>
-  </action>
-  <action name="actionSaveAsRPM">
-   <property name="text">
-    <string>As &amp;RPM</string>
-   </property>
-  </action>
-  <action name="actionAboutQt">
-   <property name="text">
-    <string>About Qt</string>
-   </property>
-  </action>
-  <action name="actionShowDiagnostics">
-   <property name="text">
-    <string>Show Diagnostics</string>
-   </property>
-  </action>
-  <action name="actionSaveTailoring">
-   <property name="text">
-    <string>Save Customization O&amp;nly</string>
-   </property>
-  </action>
-  <action name="actionOpenSSG">
-   <property name="text">
-    <string>Open content from &amp;SCAP Security Guide</string>
-   </property>
-  </action>
-  <action name="actionOpenCustomizationFile">
-   <property name="text">
-    <string>Open &amp;Customization File</string>
-   </property>
-  </action>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>ResultViewer</class>
-   <extends>QWidget</extends>
-   <header>ResultViewer.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>RemoteMachineComboBox</class>
-   <extends>QWidget</extends>
-   <header>RemoteMachineComboBox.h</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>RuleResultsTree</class>
-   <extends>QWidget</extends>
-   <header>RuleResultsTree.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
- <tabstops>
-  <tabstop>checklistComboBox</tabstop>
-  <tabstop>tailoringFileComboBox</tabstop>
-  <tabstop>profileComboBox</tabstop>
-  <tabstop>customizeProfileButton</tabstop>
-  <tabstop>localMachineRadioButton</tabstop>
-  <tabstop>remoteMachineRadioButton</tabstop>
-  <tabstop>remoteMachineDetails</tabstop>
-  <tabstop>expandRulesButton</tabstop>
-  <tabstop>ruleResultsTree</tabstop>
-  <tabstop>showGuideButton</tabstop>
-  <tabstop>dryRunCheckBox</tabstop>
-  <tabstop>fetchRemoteResourcesCheckbox</tabstop>
-  <tabstop>onlineRemediationCheckBox</tabstop>
-  <tabstop>scanButton</tabstop>
-  <tabstop>cancelButton</tabstop>
-  <tabstop>clearButton</tabstop>
-  <tabstop>offlineRemediateButton</tabstop>
- </tabstops>
  <resources/>
  <connections>
   <connection>
@@ -722,44 +477,12 @@
    <slot>setVisible(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>781</x>
-     <y>200</y>
+     <x>432</x>
+     <y>234</y>
     </hint>
     <hint type="destinationlabel">
-     <x>437</x>
-     <y>216</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>actionQuit</sender>
-   <signal>triggered()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>close()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>-1</x>
-     <y>-1</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>399</x>
-     <y>324</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>ruleResultsTree</sender>
-   <signal>allRuleResultsExpanded(bool)</signal>
-   <receiver>MainWindow</receiver>
-   <slot>allRuleResultsExpanded(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>20</x>
-     <y>20</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>20</x>
-     <y>20</y>
+     <x>321</x>
+     <y>270</y>
     </hint>
    </hints>
   </connection>

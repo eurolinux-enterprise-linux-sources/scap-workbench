@@ -42,9 +42,6 @@ class NAME : public std::runtime_error \
 SCAP_WORKBENCH_SIMPLE_EXCEPTION(MainWindowException,
     "There was a problem with MainWindow!\n");
 
-SCAP_WORKBENCH_SIMPLE_EXCEPTION(RuleResultsTreeException,
-    "There was a problem with RuleResultsTree!\n");
-
 SCAP_WORKBENCH_SIMPLE_EXCEPTION(ScanningSessionException,
     "There was a problem with ScanningSession!\n");
 
@@ -57,13 +54,10 @@ SCAP_WORKBENCH_SIMPLE_EXCEPTION(SshConnectionException,
 SCAP_WORKBENCH_SIMPLE_EXCEPTION(TailoringWindowException,
     "There was a problem with TailoringWindow!\n");
 
-SCAP_WORKBENCH_SIMPLE_EXCEPTION(TemporaryDirException,
-    "There was a problem with TemporaryDir!\n");
-
 SCAP_WORKBENCH_SIMPLE_EXCEPTION(OscapScannerRemoteSshException,
     "There was a problem with OscapScannerRemoteSsh!\n");
 
-SCAP_WORKBENCH_SIMPLE_EXCEPTION(RPMOpenHelperException,
-    "There was a problem with RPMOpenHelper!\n");
+SCAP_WORKBENCH_SIMPLE_EXCEPTION(TemporaryDirException,
+    "There was a problem with TemporaryDir!\n");
 
 #endif

@@ -48,35 +48,22 @@ class OscapScannerBase : public Scanner
         virtual void signalCompletion(bool canceled);
 
         bool checkPrerequisites();
-        QString surroundQuote(const QString& input)const;
+
         QStringList buildEvaluationArgs(const QString& inputFile,
                                         const QString& tailoringFile,
                                         const QString& resultFile,
                                         const QString& reportFile,
                                         const QString& arfFile,
-                                        bool onlineRemediation,
-                                        bool ignoreCapabilities = false) const;
+                                        bool onlineRemediation) const;
         QStringList buildOfflineRemediationArgs(const QString& resultInputFile,
                                                 const QString& resultFile,
                                                 const QString& reportFile,
-                                                const QString& arfFile,
-                                                bool ignoreCapabilities = false) const;
+                                                const QString& arfFile) const;
 
         /// Last read rule id
         QString mLastRuleID;
-        /// Last downloading file
-        QString mLastDownloadingFile;
-
-        enum ReadingState
-        {
-            RS_READING_PREFIX,
-            RS_READING_RULE_RESULT,
-            RS_READING_DOWNLOAD_FILE,
-            RS_READING_DOWNLOAD_FILE_STATUS
-        };
-
-        ReadingState mReadingState;
-
+        /// If true we are in the rule ID reading phase, if false we are reading rule result
+        bool mReadingRuleID;
         /// We keep filling this buffer until we reach : or \n
         QString mReadBuffer;
 
@@ -94,11 +81,6 @@ class OscapScannerBase : public Scanner
          */
         void readStdOut(QProcess& process);
         void watchStdErr(QProcess& process);
-
-        /**
-         * @brief Converts OpenSCAP CLI messages to SCAP Workbench GUI messages.
-         */
-        QString guiFriendlyMessage(const QString& cliMessage);
 
         bool mCancelRequested;
 

@@ -20,13 +20,7 @@
  */
 
 #include "DiagnosticsDialog.h"
-
-#include <QAbstractEventDispatcher>
-#include <QApplication>
-#include <QClipboard>
-
 #include <iostream>
-#include <unistd.h>
 
 DiagnosticsDialog::DiagnosticsDialog(QWidget* parent):
     QDialog(parent)
@@ -34,16 +28,9 @@ DiagnosticsDialog::DiagnosticsDialog(QWidget* parent):
     mUI.setupUi(this);
 
     QObject::connect(
-        mUI.clipboardButton, SIGNAL(clicked()),
-        this, SLOT(copyToClipboard())
-    );
-
-    QObject::connect(
-        mUI.closeButton, SIGNAL(clicked()),
+        mUI.closeButton, SIGNAL(released()),
         this, SLOT(hide())
     );
-
-    dumpVersionInfo();
 }
 
 DiagnosticsDialog::~DiagnosticsDialog()
@@ -54,46 +41,28 @@ void DiagnosticsDialog::clear()
     mUI.messages->clear();
 }
 
-void DiagnosticsDialog::waitUntilHidden(unsigned int interval)
+void DiagnosticsDialog::infoMessage(const QString& message)
 {
-    while (isVisible())
-    {
-        QAbstractEventDispatcher::instance(0)->processEvents(QEventLoop::AllEvents);
-        usleep(interval * 1000);
-    }
+    pushMessage("[info] " + message);
 }
 
-void DiagnosticsDialog::infoMessage(const QString& message, MessageFormat format)
+void DiagnosticsDialog::warningMessage(const QString& message)
 {
-    pushMessage(MS_INFO, message, format);
-}
-
-void DiagnosticsDialog::warningMessage(const QString& message, MessageFormat format)
-{
-    pushMessage(MS_WARNING, message, format);
+    pushMessage("[warn] " + message);
 
     // warning message is important, make sure the diagnostics are shown
     show();
 }
 
-void DiagnosticsDialog::errorMessage(const QString& message, MessageFormat format)
+void DiagnosticsDialog::errorMessage(const QString& message)
 {
-    pushMessage(MS_ERROR, message, format);
+    pushMessage("[err ] " + message, true);
 
     // error message is important, make sure the diagnostics are shown
     show();
 }
 
-void DiagnosticsDialog::exceptionMessage(const std::exception& e, const QString& context, MessageFormat format)
-{
-    pushMessage(MS_EXCEPTION, (context.isEmpty() ? "" : context + "\n\n" + QString::fromUtf8(e.what())), format);
-
-    // error message is important, make sure the diagnostics are shown
-    show();
-}
-
-
-void DiagnosticsDialog::pushMessage(MessageSeverity severity, const QString& fullMessage, MessageFormat format)
+void DiagnosticsDialog::pushMessage(const QString& fullMessage, const bool error)
 {
     char stime[11];
     stime[10] = '\0';
@@ -106,63 +75,9 @@ void DiagnosticsDialog::pushMessage(MessageSeverity severity, const QString& ful
 
     strftime(stime, 10, "%H:%M:%S", timeinfo);
 
-    QString strSeverity = QObject::tr("unknown");
-    QString bgCol = "transparent";
-    switch (severity)
-    {
-        case MS_INFO:
-            strSeverity = QObject::tr("info");
-            break;
-        case MS_WARNING:
-            strSeverity = QObject::tr("warning");
-            bgCol = "#ffff99";
-            break;
-        case MS_EXCEPTION:
-            strSeverity = QObject::tr("except");
-            bgCol = "#cc9933";
-            break;
-        case MS_ERROR:
-            strSeverity = QObject::tr("error");
-            bgCol = "#cc9933";
-            break;
+    const QString outMessage = QString(stime) + " | " + fullMessage;
 
-        default:
-            break;
-    }
+    std::cerr << outMessage.toUtf8().constData() << std::endl;
 
-    strSeverity = strSeverity.leftJustified(8);
-
-    std::cerr << stime << " | " << strSeverity.toUtf8().constData() << " | " << fullMessage.toUtf8().constData() << std::endl;
-   
-    QString outputMessage = fullMessage;
-    if (format & MF_XML)
-    {
-        outputMessage = Qt::escape(outputMessage);
-    }
-    
-    if (format & MF_PREFORMATTED)
-    {
-        outputMessage = QString("<pre>%1</pre>").arg(outputMessage);
-    }
-    
-    mUI.messages->append(
-        QString("<table><tr><td style=\"padding:5px 0px 0px 5px\"><pre>%1 </pre></td><td style=\"background: %2; padding:5px\"><pre>%3 </pre></td><td>%4</td></tr></table>\n")
-            .arg(stime, bgCol, strSeverity, outputMessage)
-    );
+    mUI.messages->append(outMessage + "\n");
 }
-
-void DiagnosticsDialog::dumpVersionInfo()
-{
-    // We display this in Help->About as well but let us dump it as info message
-    // in case workbench crashes before user can work with the GUI.
-    infoMessage(QString("SCAP Workbench %1, compiled with Qt %2, using OpenSCAP %3").arg(SCAP_WORKBENCH_VERSION, QT_VERSION_STR, oscap_get_version()));
-}
-
-void DiagnosticsDialog::copyToClipboard()
-{
-    const QString fullLog = mUI.messages->toPlainText();
-    QClipboard* clipboard = QApplication::clipboard();
-    clipboard->setText(fullLog);
-}
-
-DiagnosticsDialog* globalDiagnosticsDialog = NULL;

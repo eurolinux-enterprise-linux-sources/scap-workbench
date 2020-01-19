@@ -28,7 +28,6 @@
 #include <QMainWindow>
 #include <QThread>
 #include <QMenu>
-#include <QMessageBox>
 
 extern "C"
 {
@@ -46,15 +45,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
     public:
-        explicit MainWindow(QWidget* parent = 0);
+        MainWindow(QWidget* parent = 0);
         virtual ~MainWindow();
-
-        inline QSettings* getQSettings()
-        {
-            return mQSettings;
-        }
-
-        void setSkipValid(bool skipValid);
 
     public slots:
         /**
@@ -66,10 +58,6 @@ class MainWindow : public QMainWindow
          * @brief Opens a specific file
          */
         void openFile(const QString& path);
-
-        void openSSGDialog(const QString& customDismissLabel = "");
-
-        void openTailoringFile(const QString& path);
 
         /**
          * @brief Opens a file dialog and makes user select a file or exit the app
@@ -88,24 +76,9 @@ class MainWindow : public QMainWindow
         void openFileDialogAsync();
 
         /**
-         * @brief Queues the MainWindow to be closed later when in the event loop
-         *
-         * This avoids the window closing before the event loop is entered.
-         * @see MainWindow::closeMainWindow
-         */
-        void closeMainWindowAsync();
-
-        /**
          * @brief Checks whether a file is currently opened
          */
         bool fileOpened() const;
-
-        /**
-         * @brief Retrieves full (absolute) path of opened file
-         *
-         * @note Returns empty string if no file is opened
-         */
-        QString getOpenedFilePath() const;
 
         /**
          * @brief Automatically determines scanner mode based on checkbox state
@@ -141,13 +114,6 @@ class MainWindow : public QMainWindow
          */
         void cancelScanAsync();
 
-        /**
-         * @brief calls setEnable(true)
-         *
-         * @internal Required because of signal slot mechanism binding in TailoringWindow
-         */
-        void enable();
-
     protected:
         /// reimplemented to make sure we cancel any scanning before closing the window
         virtual void closeEvent(QCloseEvent* event);
@@ -174,9 +140,6 @@ class MainWindow : public QMainWindow
         void reloadSession();
 
     public: // TailoringWindow calls this
-        void notifyTailoringFinished(bool newProfile, bool changesConfirmed);
-
-    private:
         /**
          * @brief Refreshes items of the profile combobox with data from the session
          *
@@ -184,13 +147,7 @@ class MainWindow : public QMainWindow
          */
         void refreshProfiles();
 
-        /**
-         * @brief Refreshes the checklists combobox from scratch
-         *
-         * @note Does not keep the previous selection!
-         * @note Throws exceptions!
-         */
-        void refreshChecklists();
+    private:
 
         /**
          * @brief Destroys the scanning thread and associated data
@@ -202,24 +159,21 @@ class MainWindow : public QMainWindow
         /// UI designed in Qt Designer
         Ui_MainWindow mUI;
 
-        /// QSettings for scap-workbench
-        QSettings* mQSettings;
-
-        /// Qt Dialog that displays messages (errors, warnings, info)
+        /// Qt Dialog that displays messages (errors, warnings, infos)
         /// Gets shown whenever a warning or error is emitted
         DiagnosticsDialog* mDiagnosticsDialog;
 
-        /// Qt Dialog that shows command line arguments used for evaluation
-        /// This is shown when user checks the "dry run" checkbox
-        CommandLineArgsDialog* mCommandLineArgsDialog;
+        /// Menu used for the tailor "combo pushbutton"
+        QMenu* mSaveMenu;
 
-        /// Needed for SCAP RPM opening functionality
-        RPMOpenHelper* mRPMOpenHelper;
+        QAction* mSaveIntoDirAction;
+        QAction* mSaveAsRPMAction;
 
-        /// If true, openscap validation is skipped
-        bool mSkipValid;
         /// This is our central point of interaction with openscap
         ScanningSession* mScanningSession;
+
+        /// Qt Dialog that displays results and allows user to save them
+        ResultViewer* mResultViewer;
 
         /// Thread that handles scanning and/or remediating, NULL if none is underway
         QThread* mScanThread;
@@ -233,9 +187,6 @@ class MainWindow : public QMainWindow
         int mOldTailoringComboBoxIdx;
         QVariant mLoadedTailoringFileUserData;
 
-        /// If true, the profile combobox change signal is ignored, this avoids unnecessary profile refreshes
-        bool mIgnoreProfileComboBox;
-
     signals:
         /**
          * @brief We signal this to show the dialog
@@ -246,19 +197,11 @@ class MainWindow : public QMainWindow
         void showOpenFileDialog();
 
         /**
-         * @brief We signal this to close the MainWindow
-         *
-         * This is to make sure we close the MainWindow during the event loop, not
-         * before it even starts.
-         */
-        void closeMainWindow();
-
-        /**
          * @brief This is signaled when scanning is canceled
          *
          * Qt handles thread messaging for us via the slot & signal mechanism.
          * The event loop of MainWindow runs in one thread, the event loop of
-         * the scanner runs in another thread. Both are basically synchronization
+         * the scanner runs in another thread. Both are basically synchronisation
          * queues. This is why we emit this signal instead of calling scanner's
          * methods directly.
          *
@@ -275,30 +218,12 @@ class MainWindow : public QMainWindow
         /// Profile change, we simply change the profile id in the session
         void profileComboboxChanged(int index);
 
-    private:
-        /**
-         * @brief Refreshes the list of tailoring profiles and loads the first tailored one
-         */
-        void refreshTailoringProfiles();
-
-        /**
-         * @brief Retrieves number of currently selected rules
-         *
-         * Do not rely on this number, it is a fairly reliable estimate
-         * but it is still an estimate!
-         *
-         * @see refreshSelectedRulesTree
-         */
-        unsigned int getSelectedRulesCount();
-
-        /**
-         * @brief Ask user to proceed with closing old file due to openning of new one
-         *
-         * @return user answer
-         */
-        QMessageBox::StandardButton openNewFileQuestionDialog(const QString& oldFilepath);
+    public slots:
+        /// Refreshes the selected rules tree according to current profile
+        void refreshSelectedRulesTree();
 
     private slots:
+
         /**
          * @brief This slot gets triggered by the scanner to notify of a new result
          *
@@ -351,16 +276,18 @@ class MainWindow : public QMainWindow
         void scanFinished();
 
         /**
-         * @brief Triggered when scanning ends
+         * @brief When triggered, the ResultViewer is shown as a modal dialog
          *
-         * @param canceled if true the scanning was canceled, otherwise it finished
+         * Sole application control is passed to ResultViewer until user closes
+         * it. It is not destroyed upon closing, just hidden.
          */
-        void scanEnded(bool canceled);
-
-        void openCustomizationFile();
+        void showResults();
 
         void inheritAndEditProfile(bool shadowed);
-        TailoringWindow* editProfile(bool newProfile);
+
+        void tailorNewID();
+        void tailorShadowed();
+        void editProfile();
 
         /**
          * @brief If current profile has been tailored, it gets edited, else it gets tailored with new ID
@@ -378,72 +305,8 @@ class MainWindow : public QMainWindow
 
         void markUnsavedTailoringChanges();
         void markNoUnsavedTailoringChanges();
-        void markRemoveLoadedTailoringFile();
         void markLoadedTailoringFile(const QString& filePath);
         bool unsavedTailoringChanges() const;
-
-    public:
-        QString getDefaultSaveDirectory();
-        void notifySaveActionConfirmed(const QString& path, bool isDir);
-
-    private slots:
-        void showGuide();
-
-        /**
-         * @brief Users QDesktopServices to start browser and show user manual in it
-         *
-         * This may not do anything in case user has invalid desktop environment
-         * configuration.
-         */
-        void showUserManual();
-
-        /**
-         * @brief Displays a dialog with information about SCAP Workbench
-         *
-         * This is the customary Help->About dialog. Shows version info,
-         * short description of the application, etc...
-         */
-        void about();
-
-        /**
-         * @brief Displays a dialog with information about Qt version used
-         *
-         * Just a delegate that calls QMessageBox::aboutQt(..)
-         */
-        void aboutQt();
-
-        /**
-         * @brief Toggles all rule results description state
-         *
-         * Toogles exhibition of description of all rules between collapsed/expanded
-         */
-        void toggleRuleResultsExpanded();
-        void toggleRuleResultsExpanded(bool checked);
-
-        /// Pops up a save dialog for a bash remediation (based just on the currently selected profile)
-        void generateBashRemediationRole();
-        /// Pops up a save dialog for an ansible remediation (based just on the currently selected profile)
-        void generateAnsibleRemediationRole();
-        /// Pops up a save dialog for an puppet remediation (based just on the currently selected profile)
-        void generatePuppetRemediationRole();
-
-    public slots:
-        /**
-         * @brief Changes state of Expand all/Collapse all button according to boolean received
-         *
-         * @param checked If true, sets actionToggleRuleResults push button to "Collapse all",
-         * if false, sets actionToggleRuleResults to "Expand all"
-         *
-         * @note This function does not toggles the RuleResults, just updates state of MainWindow
-         * according to current RuleResults state
-         */
-        void allRuleResultsExpanded(bool checked);
-
-    private:
-        void setRuleResultsExpanded(bool checked);
-        void setActionToggleRuleResultsText(bool checked);
-
-        bool mRuleResultsExpanded;
 };
 
 #endif

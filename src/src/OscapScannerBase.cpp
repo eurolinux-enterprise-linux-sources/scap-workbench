@@ -36,8 +36,7 @@ OscapScannerBase::OscapScannerBase():
     Scanner(),
 
     mLastRuleID(""),
-    mLastDownloadingFile(""),
-    mReadingState(RS_READING_PREFIX),
+    mReadingRuleID(true),
     mReadBuffer(""),
     mCancelRequested(false)
 {
@@ -80,8 +79,7 @@ void OscapScannerBase::signalCompletion(bool canceled)
     Scanner::signalCompletion(canceled);
 
     mLastRuleID = "";
-    mLastDownloadingFile = "";
-    mReadingState = RS_READING_PREFIX;
+    mReadingRuleID = true;
     mReadBuffer = "";
 
     // reset the cancel flag now that we have finished XOR canceled
@@ -93,7 +91,7 @@ bool OscapScannerBase::checkPrerequisites()
     if (!mCapabilities.baselineSupport())
     {
         emit errorMessage(
-            QObject::tr("oscap tool doesn't support basic features required for workbench. "
+            QString("oscap tool doesn't support basic features required for workbench. "
                 "Please make sure you have openscap 0.8.0 or newer. "
                 "oscap version was detected as '%1'.").arg(mCapabilities.getOpenSCAPVersion())
         );
@@ -104,7 +102,7 @@ bool OscapScannerBase::checkPrerequisites()
     if (mScannerMode == SM_SCAN_ONLINE_REMEDIATION && !mCapabilities.onlineRemediation())
     {
         emit errorMessage(
-            QObject::tr("oscap tool doesn't support online remediation. "
+            QString("oscap tool doesn't support online remediation. "
                 "Please make sure you have openscap 0.9.5 or newer if you want "
                 "to use online remediation. "
                 "oscap version was detected as '%1'.").arg(mCapabilities.getOpenSCAPVersion())
@@ -116,7 +114,7 @@ bool OscapScannerBase::checkPrerequisites()
     if (mScannerMode == SM_OFFLINE_REMEDIATION && !mCapabilities.ARFInput())
     {
         emit errorMessage(
-            QObject::tr("oscap tool doesn't support taking ARFs (result datastreams) as input. "
+            QString("oscap tool doesn't support taking ARFs (result datastreams) as input. "
                 "Please make sure you have openscap <NOT IMPLEMENTED YET> or newer if you want "
                 "to use offline remediation. "
                 "oscap version was detected as '%1'.").arg(mCapabilities.getOpenSCAPVersion())
@@ -128,7 +126,7 @@ bool OscapScannerBase::checkPrerequisites()
     if (mSession->isSDS() && !mCapabilities.sourceDatastreams())
     {
         emit errorMessage(
-            QObject::tr("oscap tool doesn't support source datastreams as input. "
+            QString("oscap tool doesn't support source datastreams as input. "
                 "Please make sure you have openscap 0.9.0 or newer if you want "
                 "to use source datastreams. "
                 "oscap version was detected as '%1'.").arg(mCapabilities.getOpenSCAPVersion())
@@ -140,9 +138,9 @@ bool OscapScannerBase::checkPrerequisites()
     if (mSession->hasTailoring() && !mCapabilities.tailoringSupport())
     {
         emit errorMessage(
-            QObject::tr("oscap tool doesn't support XCCDF tailoring but the session uses tailoring. "
+            QString("oscap tool doesn't support XCCDF tailoring but the session uses tailoring. "
                 "Please make sure you have openscap 0.9.12 or newer on the target machine if you "
-                "want to use tailoring features of SCAP Workbench. "
+                 "want to use tailoring features of scap-workbench. "
                 "oscap version was detected as '%1'.").arg(mCapabilities.getOpenSCAPVersion())
         );
 
@@ -152,35 +150,16 @@ bool OscapScannerBase::checkPrerequisites()
     return true;
 }
 
-QString OscapScannerBase::surroundQuote(const QString& input) const
-{
-    if (input.contains(" "))
-        return QString("\""+input+"\"");
-
-    return input;
-}
-
 QStringList OscapScannerBase::buildEvaluationArgs(const QString& inputFile,
         const QString& tailoringFile,
         const QString& resultFile,
         const QString& reportFile,
         const QString& arfFile,
-        bool onlineRemediation,
-        bool ignoreCapabilities) const
+        bool onlineRemediation) const
 {
     QStringList ret;
     ret.append("xccdf");
     ret.append("eval");
-
-    if (mSkipValid)
-    {
-        ret.append("--skip-valid");
-    }
-
-    if (mFetchRemoteResources)
-    {
-        ret.append("--fetch-remote-resources");
-    }
 
     if (mSession->isSDS())
     {
@@ -203,70 +182,15 @@ QStringList OscapScannerBase::buildEvaluationArgs(const QString& inputFile,
     if (!tailoringFile.isEmpty())
     {
         ret.append("--tailoring-file");
-        if (mDryRun)
-            ret.append(surroundQuote(tailoringFile));
-        else
-            ret.append(tailoringFile);
+        ret.append(tailoringFile);
     }
 
-    const QString profileId = mSession->getProfile();
+    const QString profileId = mSession->getProfileID();
 
     if (!profileId.isEmpty())
     {
         ret.append("--profile");
         ret.append(profileId);
-    }
-
-    // We don't use these results directly but openscap uses them when generating
-    // the HTML report! We get more info in the HTML report if we request OVAL
-    // results!
-    ret.append("--oval-results");
-
-    ret.append("--results");
-    if (mDryRun)
-        ret.append(surroundQuote(resultFile));
-    else
-        ret.append(resultFile);
-
-    ret.append("--results-arf");
-    if (mDryRun)
-        ret.append(surroundQuote(arfFile));
-    else
-        ret.append(arfFile);
-
-    ret.append("--report");
-    if (mDryRun)
-        ret.append(surroundQuote(reportFile));
-    else
-        ret.append(reportFile);
-
-    if (ignoreCapabilities || mCapabilities.progressReporting())
-        ret.append("--progress");
-
-    if (onlineRemediation && (ignoreCapabilities || mCapabilities.onlineRemediation()))
-        ret.append("--remediate");
-
-    if (mDryRun)
-        ret.append(surroundQuote(inputFile));
-    else
-        ret.append(inputFile);
-
-    return ret;
-}
-
-QStringList OscapScannerBase::buildOfflineRemediationArgs(const QString& resultInputFile,
-        const QString& resultFile,
-        const QString& reportFile,
-        const QString& arfFile,
-        bool ignoreCapabilities) const
-{
-    QStringList ret;
-    ret.append("xccdf");
-    ret.append("remediate");
-
-    if (mSkipValid)
-    {
-        ret.append("--skip-valid");
     }
 
     // We don't use these results directly but openscap uses them when generating
@@ -283,7 +207,41 @@ QStringList OscapScannerBase::buildOfflineRemediationArgs(const QString& resultI
     ret.append("--report");
     ret.append(reportFile);
 
-    if (ignoreCapabilities || mCapabilities.progressReporting())
+    if (mCapabilities.progressReporting())
+        ret.append("--progress");
+
+    if (onlineRemediation && mCapabilities.onlineRemediation())
+        ret.append("--remediate");
+
+    ret.append(inputFile);
+
+    return ret;
+}
+
+QStringList OscapScannerBase::buildOfflineRemediationArgs(const QString& resultInputFile,
+        const QString& resultFile,
+        const QString& reportFile,
+        const QString& arfFile) const
+{
+    QStringList ret;
+    ret.append("xccdf");
+    ret.append("remediate");
+
+    // We don't use these results directly but openscap uses them when generating
+    // the HTML report! We get more info in the HTML report if we request OVAL
+    // results!
+    ret.append("--oval-results");
+
+    ret.append("--results");
+    ret.append(resultFile);
+
+    ret.append("--results-arf");
+    ret.append(arfFile);
+
+    ret.append("--report");
+    ret.append(reportFile);
+
+    if (mCapabilities.progressReporting())
         ret.append("--progress");
 
     ret.append(resultInputFile);
@@ -302,102 +260,36 @@ bool OscapScannerBase::tryToReadStdOutChar(QProcess& process)
 
     if (readChar == ':')
     {
-        switch (mReadingState)
+        mLastRuleID = mReadBuffer;
+        if (mReadingRuleID) // sanity check
         {
-            case RS_READING_PREFIX:
-                {
-                    // Openscap <= 1.2.10 (60fb9f0c98eee) sends this message through stdout
-                    if (mReadBuffer=="Downloading")
-                    {
-                         mReadingState = RS_READING_DOWNLOAD_FILE;
-                    }
-                    else
-                    {
-                        mLastRuleID = mReadBuffer;
-                        emit progressReport(mLastRuleID, "processing");
-                        mReadingState = RS_READING_RULE_RESULT;
-                    }
-                    mReadBuffer = "";
-                }
-                break;
-
-            case RS_READING_RULE_RESULT:
-                {
-                    emit warningMessage(QString(
-                                QObject::tr("Error when parsing scan progress output from stdout of the 'oscap' process. "
-                                    "':' encountered while not reading rule ID, newline and/or rule result are missing! "
-                                    "Read buffer is '%1'.")).arg(mReadBuffer));
-                    mReadBuffer = "";
-                }
-                break;
-            case RS_READING_DOWNLOAD_FILE:
-                {
-                    // When fetching remote content, openscap will inform scap-workbench about
-                    // resources being downloaded. Keep any colon found in URL of file being downloaded.
-                    mReadBuffer.append(QChar::fromAscii(readChar));
-                }
-                break;
-
-            default:
-                // noop
-                break;
+            emit progressReport(mLastRuleID, "processing");
         }
+        else
+        {
+            emit warningMessage(QString(
+                "Error when parsing scan progress output from stdout of the 'oscap' process. "
+                "':' encountered while not reading rule ID, newline and/or rule result are missing! "
+                "Read buffer is '%1'.").arg(mReadBuffer));
+        }
+        mReadBuffer = "";
+        mReadingRuleID = false;
     }
     else if (readChar == '\n')
     {
-        switch(mReadingState)
+        if (!mReadingRuleID) // sanity check
         {
-            case RS_READING_PREFIX:
-                // If we found a '\n' while reading prefix, we might have received an error or
-                // warning message through stdout.
-                if (mReadBuffer.contains("--fetch-remote-resources"))
-                {
-                    // If message is about --fetch-remote-resources, emit a nice warning.
-                    // This is needed for workbench to be able to handle messages from machines
-                    // running older versions of openscap.
-                    // From openscap version 1.2.11, this message is sent through stderr
-                    // and therefore is handled accordingly by workbench.
-                    emit warningMessage(guiFriendlyMessage(mReadBuffer));
-                }
-                else
-                {
-                    // No other error or warning messages are expected through stdout,
-                    // so it is likely that a parsing error occured.
-                    emit warningMessage(QString(
-                                QObject::tr("Error when parsing scan progress output from stdout of the 'oscap' process. "
-                                    "Newline encountered while reading rule ID, rule result and/or ':' are missing! "
-                                    "Read buffer is '%1'.")).arg(mReadBuffer));
-                }
-                break;
-
-            case RS_READING_RULE_RESULT:
-                emit progressReport(mLastRuleID, mReadBuffer);
-                break;
-
-            case RS_READING_DOWNLOAD_FILE_STATUS:
-                {
-                    QString downloadStatus = mReadBuffer.mid(1);
-                    if (downloadStatus == "ok")
-                        emit infoMessage(QString("Downloading of \"%1\" finished: %2").arg(mLastDownloadingFile).arg(downloadStatus));
-                    else
-                        emit warningMessage(QString("Failed to download \"%1\"!").arg(mLastDownloadingFile));
-                }
-                break;
+            emit progressReport(mLastRuleID, mReadBuffer);
         }
-        mReadingState = RS_READING_PREFIX;
+        else
+        {
+            emit warningMessage(QString(
+                "Error when parsing scan progress output from stdout of the 'oscap' process. "
+                "Newline encountered while reading rule ID, rule result and/or ':' are missing! "
+                "Read buffer is '%1'.").arg(mReadBuffer));
+        }
         mReadBuffer = "";
-    }
-    else if ( (readChar == '.') && (mReadingState == RS_READING_DOWNLOAD_FILE) && (mReadBuffer.endsWith(" ..")))
-    {
-        int urlLen = mReadBuffer.length();
-        urlLen -= 1; // without first space
-        urlLen -= 3; // without "progress dots"
-        mLastDownloadingFile = mReadBuffer.mid(1, urlLen);
-
-        emit infoMessage(QString("Downloading of \"%1\"...").arg(mLastDownloadingFile));
-
-        mReadBuffer = "";
-        mReadingState = RS_READING_DOWNLOAD_FILE_STATUS;
+        mReadingRuleID = true;
     }
     else
     {
@@ -420,46 +312,17 @@ void OscapScannerBase::watchStdErr(QProcess& process)
 {
     process.setReadChannel(QProcess::StandardError);
 
-    QString stdErrOutput("");
+    QString errorMessage = QString::Null();
 
-    // As readStdOut() is greedy and will continue reading for as long as there is output for it,
-    // by the time we come to handle sdterr output there may be multiple warning and/or error messages.
     while (process.canReadLine())
     {
         // Trailing \n is returned by QProcess::readLine
-        stdErrOutput = process.readLine();
-
-        if (!stdErrOutput.isEmpty())
-        {
-            if (stdErrOutput.contains("WARNING: "))
-            {
-                QString guiMessage = guiFriendlyMessage(stdErrOutput);
-                emit warningMessage(QObject::tr(guiMessage.toUtf8().constData()));
-            }
-            // Openscap >= 1.2.11 (60fb9f0c98eee) sends this message through stderr
-            else if (stdErrOutput.contains(QRegExp("^Downloading: .+ \\.{3} \\w+\\n")))
-            {
-                emit infoMessage(stdErrOutput);
-            }
-            else
-            {
-                emit errorMessage(QObject::tr("The 'oscap' process has written the following content to stderr:\n"
-                                            "%1").arg(stdErrOutput));
-            }
-        }
-
+        errorMessage += process.readLine();
     }
 
-}
-
-QString OscapScannerBase::guiFriendlyMessage(const QString& cliMessage)
-{
-    QString guiMessage = cliMessage;
-
-    // Remove "WARNING:" prefix and trailing \n
-    guiMessage.remove(QRegExp("(WARNING: )|\n"));
-
-    if (cliMessage.contains("--fetch-remote-resources"))
-        guiMessage = QString("Remote resources might be necessary for this profile to work properly. Please select \"Fetch remote resources\" for complete scan");
-    return guiMessage;
+    if (!errorMessage.isEmpty())
+    {
+        emit warningMessage(QString("The 'oscap' process has written the following content to stderr:\n"
+                                    "%1").arg(errorMessage));
+    }
 }

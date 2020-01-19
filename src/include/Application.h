@@ -21,58 +21,13 @@
 
 #include "ForwardDecls.h"
 #include <QApplication>
-#include <QTranslator>
 
-/**
- * @brief Central application
- *
- * Constructs the MainWindow.
- * Technically, this class is a singleton because of the qApp global pointer
- * and the QCoreApplication::instance() static method.
- *
- * This class is virtual solely because of the qApp() macro and the singleton
- * nature of QApplication.
- */
 class Application : public QApplication
 {
     public:
-        /**
-         * Make *sure* argc will be valid during lifetime of this class, you are
-         * passing a reference! Qt can alter argc when it parses the command line.
-         * If argc is deleted by then this will cause an invalid write!
-         */
         Application(int& argc, char** argv);
-        virtual ~Application();
+        ~Application();
 
     private:
-        /**
-         * @brief Processes command line arguments and acts accordingly
-         */
-        void processCLI(QStringList& args);
-
-        /**
-         * @brief Opens the SSG integration dialog to let user open SSG
-         */
-        void openSSG();
-
-        /**
-         * @brief Opens a file dialog, allowing user to open any content
-         */
-        void browseForContent();
-
-        /**
-         * @brief Prints version of SCAP Workbench
-         */
-        void printVersion();
-
-        /**
-         * @brief Prints help of SCAP Workbench
-         */
-        void printHelp();
-
-        /// Whether the application should quit
-        bool mShouldQuit;
-        /// Needed for QObject::tr(..) to work properly, loaded on app startup
-        QTranslator mTranslator;
         MainWindow* mMainWindow;
 };

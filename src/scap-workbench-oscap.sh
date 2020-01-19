@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 # Copyright 2014 Red Hat Inc., Durham, North Carolina.
 # All Rights Reserved.
@@ -18,7 +18,7 @@
 
 set -u -o pipefail
 
-trap "" SIGHUP SIGINT
+trap "" SIGHUP SIGINT SIGTERM
 
 # pkexec writes a message to stderr when user dismisses it, we always skip 1 line.
 # if user did not dismiss it we should print a dummy line to stderr so that nothing
@@ -45,15 +45,15 @@ for i in $(seq 0 `expr $# - 1`); do
 
     case "${args[i]}" in
     ("--results")
-        TARGET_RESULTS_XCCDF="${args[j]}"
+        TARGET_RESULTS_XCCDF=${args[j]}
         args[j]="$TEMP_DIR/results-xccdf.xml"
       ;;
     ("--results-arf")
-        TARGET_RESULTS_ARF="${args[j]}"
+        TARGET_RESULTS_ARF=${args[j]}
         args[j]="$TEMP_DIR/results-arf.xml"
       ;;
     ("--report")
-        TARGET_REPORT="${args[j]}"
+        TARGET_REPORT=${args[j]}
         args[j]="$TEMP_DIR/report.html"
       ;;
     *)
@@ -64,7 +64,7 @@ done
 LOCAL_OSCAP="oscap"
 
 pushd "$TEMP_DIR" > /dev/null
-$LOCAL_OSCAP "${args[@]}" &
+$LOCAL_OSCAP ${args[@]} &
 PID=$!
 RET=1
 
@@ -74,7 +74,7 @@ while kill -0 $PID 2> /dev/null; do
     ret=$?
     if [ 0 -lt $ret -a $ret -lt 128 ]; then
         # If read failed & it was not due to timeout --> parents are gone.
-        kill -s SIGTERM $PID 2> /dev/null
+        kill -s SIGINT $PID 2> /dev/null
         break
     fi
 done
@@ -84,22 +84,24 @@ RET=$?
 
 popd > /dev/null
 
-function chown_copy
+chown -R $wrapper_uid:$wrapper_gid "$TEMP_DIR"
+
+function sudo_copy
 {
-    local what="$1"
-    local where="$2"
+    local what=$1
+    local where=$2
 
-    [ ! -f "$what" ] || cp "$what" "$where"
-
-    # chown only required if wrapper_{uid,gid} differs from real_{uid,gid}
+    # sudo only required if wrapper_{uid,gid} differs from real_{uid,gid}
     if [ $wrapper_uid -ne $real_uid ] || [ $wrapper_gid -ne $real_gid ]; then
-        chown $wrapper_uid:$wrapper_gid $where
+        sudo -u \#$wrapper_uid -g \#$wrapper_gid [ ! -f "$what" ] || cp "$what" "$where"
+    else
+        [ ! -f "$what" ] || cp "$what" "$where"
     fi
 }
 
-chown_copy "$TEMP_DIR/results-xccdf.xml" "$TARGET_RESULTS_XCCDF"
-chown_copy "$TEMP_DIR/results-arf.xml" "$TARGET_RESULTS_ARF"
-chown_copy "$TEMP_DIR/report.html" "$TARGET_REPORT"
+sudo_copy "$TEMP_DIR/results-xccdf.xml" $TARGET_RESULTS_XCCDF
+sudo_copy "$TEMP_DIR/results-arf.xml" $TARGET_RESULTS_ARF
+sudo_copy "$TEMP_DIR/report.html" $TARGET_REPORT
 
 rm -r "$TEMP_DIR"
 

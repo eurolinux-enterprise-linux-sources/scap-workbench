@@ -20,18 +20,15 @@
  */
 
 #include "SaveAsRPMDialog.h"
-#include "MainWindow.h"
 #include "TemporaryDir.h"
 #include "ScanningSession.h"
 #include "ProcessHelpers.h"
 
 #include <QFileDialog>
-#include <QPointer>
 #include <cassert>
 
-SaveAsRPMDialog::SaveAsRPMDialog(ScanningSession* session, MainWindow* parent):
+SaveAsRPMDialog::SaveAsRPMDialog(ScanningSession* session, QWidget* parent):
     QDialog(parent),
-    mMainWindow(parent),
 
     mScanningSession(session)
 {
@@ -57,27 +54,14 @@ SaveAsRPMDialog::SaveAsRPMDialog(ScanningSession* session, MainWindow* parent):
 SaveAsRPMDialog::~SaveAsRPMDialog()
 {}
 
-void SaveAsRPMDialog::saveSession(ScanningSession* session, MainWindow* parent)
-{
-    QPointer<SaveAsRPMDialog> dialog = new SaveAsRPMDialog(session, parent);
-    dialog->exec();
-    delete dialog;
-}
-
 void SaveAsRPMDialog::slotFinished(int result)
 {
     if (result == QDialog::Rejected)
         return;
 
-    const QString targetDir = QFileDialog::getExistingDirectory(
-        this, QObject::tr("Select target directory"),
-        mMainWindow->getDefaultSaveDirectory()
-    );
-
+    const QString targetDir = QFileDialog::getExistingDirectory(this, "Select target directory");
     if (targetDir.isEmpty())
         return; // user canceled
-
-    mMainWindow->notifySaveActionConfirmed(targetDir, true);
 
     QSet<QString> closure = mScanningSession->getOpenedFilesClosure();
     // At this point, closure is a set which is implementation ordered.
@@ -148,7 +132,5 @@ void SaveAsRPMDialog::slotFinished(int result)
 
     scapAsRPM.setArguments(args);
 
-    QPointer<QDialog> dialog = scapAsRPM.runWithDialog(this, QObject::tr("Saving SCAP content as RPM..."), true, false);
-    dialog->exec();
-    delete dialog;
+    scapAsRPM.runWithDialog(this, "Saving SCAP content as RPM...", true, false);
 }

@@ -22,19 +22,12 @@
 #include "RemoteSsh.h"
 #include "ProcessHelpers.h"
 #include "Exceptions.h"
-#include "Utils.h"
 
 #include <QFileInfo>
 #include <QDir>
-#include <QCoreApplication>
 
 SshConnection::SshConnection(QObject* parent):
     QObject(parent),
-
-    mTarget(""),
-    mPort(22),
-
-    mSocketDir(0),
 
     mEnvironment(QProcessEnvironment::systemEnvironment()),
     mConnected(false),
@@ -42,14 +35,6 @@ SshConnection::SshConnection(QObject* parent):
 {
     mEnvironment.remove("SSH_TTY");
     mEnvironment.insert("DISPLAY", ":0");
-
-#if defined(__APPLE__)
-    static const QDir dir(QCoreApplication::applicationDirPath());
-    mEnvironment.insert("SSH_ASKPASS", dir.absoluteFilePath("scap-workbench-osx-ssh-askpass.sh"));
-#elif defined(WIN32)
-    static const QDir dir(QCoreApplication::applicationDirPath());
-    mEnvironment.insert("SSH_ASKPASS", dir.absoluteFilePath("win-ssh-askpass.exe"));
-#endif
 }
 
 SshConnection::~SshConnection()
@@ -103,14 +88,14 @@ void SshConnection::connect()
 
     try
     {
-        if (mSocketDir)
-        {
-            delete mSocketDir;
-            mSocketDir = 0;
-        }
+        SyncProcess proc(this);
+        proc.setCommand("mktemp");
+        proc.setArguments(QStringList("-d"));
+        proc.setEnvironment(mEnvironment);
+        proc.setCancelRequestSource(mCancelRequestSource);
+        proc.run();
 
-        mSocketDir = new TemporaryDir();
-        mMasterSocket = mSocketDir->getPath() + "/ssh_socket";
+        mMasterSocket = proc.getStdOutContents().trimmed() + "/ssh_socket";
     }
     catch (const SyncProcessException& e)
     {
@@ -124,30 +109,19 @@ void SshConnection::connect()
     try
     {
         QStringList args;
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-#   ifdef SCAP_WORKBENCH_LOCAL_SETSID_SUPPORTS_WAIT
-        args.append("--wait");
-#   endif
         args.append(SCAP_WORKBENCH_LOCAL_SSH_PATH);
-#endif
+        args.append("-M");
+        args.append("-f");
+        args.append("-N");
 
-        args.append("-M"); // place ssh client into "master" mode for connection sharing
-        args.append("-f"); // requests ssh to go to background before command execution
-        args.append("-N"); // do not execute a remote command (yet)
-
-        // send keep alive null messages every 60 seconds to make sure the connection stays alive
-        args.append("-o"); args.append(QString("ServerAliveInterval=%1").arg(60));
         args.append("-o"); args.append(QString("ControlPath=%1").arg(mMasterSocket));
+
         args.append("-p"); args.append(QString::number(mPort));
         // TODO: sanitize input?
         args.append(mTarget);
 
         SyncProcess proc(this);
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-        proc.setCommand(getSetSidPath());
-#else
-        proc.setCommand(SCAP_WORKBENCH_LOCAL_SSH_PATH);
-#endif
+        proc.setCommand(SCAP_WORKBENCH_LOCAL_SETSID_PATH);
         proc.setArguments(args);
         proc.setEnvironment(mEnvironment);
         proc.setCancelRequestSource(mCancelRequestSource);
@@ -179,34 +153,27 @@ void SshConnection::disconnect()
 
     {
         QStringList args;
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-#   ifdef SCAP_WORKBENCH_LOCAL_SETSID_SUPPORTS_WAIT
-        args.append("--wait");
-#   endif
-        args.append(SCAP_WORKBENCH_LOCAL_SSH_PATH);
-#endif
-
         args.append("-S"); args.append(mMasterSocket);
-        args.append("-p"); args.append(QString::number(mPort));
+
         args.append("-O"); args.append("exit");
         args.append(mTarget);
 
         SyncProcess proc(this);
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-        proc.setCommand(getSetSidPath());
-#else
         proc.setCommand(SCAP_WORKBENCH_LOCAL_SSH_PATH);
-#endif
         proc.setArguments(args);
         proc.setEnvironment(mEnvironment);
         proc.run();
     }
 
     // delete the parent temporary directory we created
-    if (mSocketDir)
+    QFileInfo socketFile(mMasterSocket);
+    QDir socketDir = socketFile.dir();
+
+    if (!socketDir.rmdir(socketDir.absolutePath()))
     {
-        delete mSocketDir;
-        mSocketDir = 0;
+        throw SshConnectionException(
+            QString("Failed to remove temporary directory hosting the ssh "
+                    "connection socket."));
     }
 
     mConnected = false;
@@ -238,11 +205,7 @@ SshSyncProcess::~SshSyncProcess()
 
 QString SshSyncProcess::generateFullCommand() const
 {
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-    return getSetSidPath();
-#else
     return SCAP_WORKBENCH_LOCAL_SSH_PATH;
-#endif
 }
 
 QStringList SshSyncProcess::generateFullArguments() const
@@ -251,15 +214,8 @@ QStringList SshSyncProcess::generateFullArguments() const
         mSshConnection.connect();
 
     QStringList args;
-#ifdef SCAP_WORKBENCH_LOCAL_SETSID_FOUND
-#   ifdef SCAP_WORKBENCH_LOCAL_SETSID_SUPPORTS_WAIT
-        args.append("--wait");
-#   endif
-    args.append(SCAP_WORKBENCH_LOCAL_SSH_PATH);
-#endif
 
     args.append("-o"); args.append(QString("ControlPath=%1").arg(mSshConnection._getMasterSocket()));
-    args.append("-p"); args.append(QString::number(mSshConnection.getPort()));
     args.append(mSshConnection.getTarget());
     args.append(SyncProcess::generateFullCommand() + QString(" ") + SyncProcess::generateFullArguments().join(" "));
 
@@ -277,4 +233,109 @@ QProcessEnvironment SshSyncProcess::generateFullEnvironment() const
 QString SshSyncProcess::generateDescription() const
 {
     return QString("Remote command '%1' on machine '%2'").arg(SyncProcess::generateDescription()).arg(mSshConnection.getTarget());
+}
+
+ScpSyncProcess::ScpSyncProcess(SshConnection& connection, QObject* parent):
+    SyncProcess(parent),
+
+    mScpDirection(SD_LOCAL_TO_REMOTE),
+    mSshConnection(connection)
+{}
+
+ScpSyncProcess::~ScpSyncProcess()
+{}
+
+void ScpSyncProcess::setDirection(ScpDirection direction)
+{
+    if (isRunning())
+        throw SyncProcessException("Already running, can't change scp direction!");
+
+    mScpDirection = direction;
+}
+
+ScpDirection ScpSyncProcess::getDirection() const
+{
+    return mScpDirection;
+}
+
+void ScpSyncProcess::setLocalPath(const QString& path)
+{
+    if (isRunning())
+        throw SyncProcessException("Already running, can't change local path!");
+
+    mLocalPath = path;
+}
+
+const QString& ScpSyncProcess::getLocalPath() const
+{
+    return mLocalPath;
+}
+
+void ScpSyncProcess::setRemotePath(const QString& path)
+{
+    if (isRunning())
+        throw SyncProcessException("Already running, can't change remote path!");
+
+    mRemotePath = path;
+}
+
+const QString& ScpSyncProcess::getRemotePath() const
+{
+    return mRemotePath;
+}
+
+QString ScpSyncProcess::generateFullCommand() const
+{
+    return "scp";
+}
+
+QStringList ScpSyncProcess::generateFullArguments() const
+{
+    if (!mSshConnection.isConnected())
+        mSshConnection.connect();
+
+    QStringList args;
+
+    args.append("-o"); args.append(QString("ControlPath=%1").arg(mSshConnection._getMasterSocket()));
+
+    if (mScpDirection == SD_LOCAL_TO_REMOTE)
+    {
+        args.append(mLocalPath);
+        args.append(QString("%1:%2").arg(mSshConnection.getTarget()).arg(mRemotePath));
+    }
+    else if (mScpDirection == SD_REMOTE_TO_LOCAL)
+    {
+        args.append(QString("%1:%2").arg(mSshConnection.getTarget()).arg(mRemotePath));
+        args.append(mLocalPath);
+    }
+    else
+    {
+        throw SyncProcessException("ScpSyncProcess has unknown direction. Can't generate full arguments.");
+    }
+
+    return args;
+}
+
+QProcessEnvironment ScpSyncProcess::generateFullEnvironment() const
+{
+    if (!mSshConnection.isConnected())
+        mSshConnection.connect();
+
+    return mSshConnection._getEnvironment();
+}
+
+QString ScpSyncProcess::generateDescription() const
+{
+    if (mScpDirection == SD_LOCAL_TO_REMOTE)
+    {
+        return QString("Copy file '%1' on local machine to file '%2' on remote machine '%3'").arg(mLocalPath).arg(mRemotePath).arg(mSshConnection.getTarget());
+    }
+    else if (mScpDirection == SD_REMOTE_TO_LOCAL)
+    {
+        return QString("Copy file '%1' on remote machine '%2' to local file '%3'").arg(mRemotePath).arg(mSshConnection.getTarget().arg(mLocalPath));
+    }
+    else
+    {
+        return QString("ScpSyncProcess with unknown direction.");
+    }
 }

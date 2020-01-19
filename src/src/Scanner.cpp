@@ -26,9 +26,6 @@ Scanner::Scanner():
     mScannerMode(SM_SCAN),
     mScanThread(0),
     mMainThread(0),
-    mDryRun(false),
-    mSkipValid(false),
-    mFetchRemoteResources(false),
     mSession(0),
     mTarget("")
 {}
@@ -44,31 +41,6 @@ void Scanner::setScanThread(QThread* thread)
 void Scanner::setMainThread(QThread* thread)
 {
     mMainThread = thread;
-}
-
-void Scanner::setDryRun(bool dryRun)
-{
-    mDryRun = dryRun;
-}
-
-void Scanner::setSkipValid(bool skip)
-{
-    mSkipValid = skip;
-}
-
-bool Scanner::getSkipValid() const
-{
-    return mSkipValid;
-}
-
-void Scanner::setFetchRemoteResources(bool fetch)
-{
-    mFetchRemoteResources = fetch;
-}
-
-bool Scanner::getFetchRemoteResources() const
-{
-    return mFetchRemoteResources;
 }
 
 void Scanner::setSession(ScanningSession* session)
@@ -123,7 +95,7 @@ void Scanner::evaluateExceptionGuard()
     catch (const std::exception& e)
     {
         emit errorMessage(
-            QObject::tr("Exception was thrown while evaluating! Details follow:\n%1").arg(QString::fromUtf8(e.what())));
+            QString("Exception was thrown while evaluating! Details follow:\n%1").arg(QString::fromUtf8(e.what())));
         signalCompletion(true);
     }
 }

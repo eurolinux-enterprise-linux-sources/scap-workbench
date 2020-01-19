@@ -20,35 +20,32 @@
  */
 
 #include "ResultViewer.h"
-#include "MainWindow.h"
 #include "Scanner.h"
-#include "OscapScannerBase.h"
-#include "OscapScannerLocal.h"
 #include "ScanningSession.h"
-#include "Utils.h"
-#include "RemediationRoleSaver.h"
 
 #include <QFileDialog>
+#include <QDesktopServices>
 #include <QMessageBox>
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+#   include <QWebFrame>
+#endif
 
 ResultViewer::ResultViewer(QWidget* parent):
-    QWidget(parent),
-
-    mReportFile(0)
+    QDialog(parent)
 {
     mUI.setupUi(this);
 
-    mSaveResultsAction = new QAction("&XCCDF Result file", this);
+    mSaveResultsAction = new QAction("XCCDF Result file", this);
     QObject::connect(
         mSaveResultsAction, SIGNAL(triggered()),
         this, SLOT(saveResults())
     );
-    mSaveARFAction = new QAction("&ARF", this);
+    mSaveARFAction = new QAction("ARF", this);
     QObject::connect(
         mSaveARFAction, SIGNAL(triggered()),
         this, SLOT(saveARF())
     );
-    mSaveReportAction = new QAction("&HTML Report", this);
+    mSaveReportAction = new QAction("HTML Report", this);
     QObject::connect(
         mSaveReportAction, SIGNAL(triggered()),
         this, SLOT(saveReport())
@@ -59,41 +56,50 @@ ResultViewer::ResultViewer(QWidget* parent):
     mSaveMenu->addAction(mSaveReportAction);
     mUI.saveButton->setMenu(mSaveMenu);
 
-    QAction* genBashRemediation = new QAction("&bash", this);
     QObject::connect(
-        genBashRemediation, SIGNAL(triggered()),
-        this, SLOT(generateBashRemediationRole())
-    );
-    QAction* genAnsibleRemediation = new QAction("&ansible", this);
-    QObject::connect(
-        genAnsibleRemediation, SIGNAL(triggered()),
-        this, SLOT(generateAnsibleRemediationRole())
-    );
-    QAction* genPuppetRemediation = new QAction("&puppet", this);
-    QObject::connect(
-        genPuppetRemediation, SIGNAL(triggered()),
-        this, SLOT(generatePuppetRemediationRole())
-    );
-    QMenu* genMenu = new QMenu(this);
-    genMenu->addAction(genBashRemediation);
-    genMenu->addAction(genAnsibleRemediation);
-    genMenu->addAction(genPuppetRemediation);
-    mUI.genRemediationButton->setMenu(genMenu);
-
-    QObject::connect(
-        mUI.openReportButton, SIGNAL(clicked()),
+        mUI.openReportButton, SIGNAL(released()),
         this, SLOT(openReport())
     );
+
+    QObject::connect(
+        mUI.closeButton, SIGNAL(released()),
+        this, SLOT(reject())
+    );
+
+    mUI.webViewContainer->setLayout(new QVBoxLayout());
+
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+    mWebView = new QWebView(mUI.webViewContainer);
+    mWebView->page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
+
+    QObject::connect(
+        mWebView, SIGNAL(linkClicked(const QUrl&)),
+        this, SLOT(webViewLinkClicked(const QUrl&))
+    );
+
+    mUI.webViewContainer->layout()->addWidget(mWebView);
+#else
+    mNoWebKitNotification = new QLabel(mUI.webViewContainer);
+    mNoWebKitNotification->setText(
+        "Workbench was compiled without WebKit support.\n"
+        "Report can't be viewed directly in the application.\n"
+        "Please click \"Open report\" to view it in an external "
+        "application instead.");
+    mNoWebKitNotification->setWordWrap(true);
+    mNoWebKitNotification->setAlignment(Qt::AlignCenter);
+    mUI.webViewContainer->layout()->addWidget(mNoWebKitNotification);
+#endif
 }
 
 ResultViewer::~ResultViewer()
-{
-    delete mReportFile;
-    mReportFile = 0;
-}
+{}
 
 void ResultViewer::clear()
 {
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+    mWebView->setContent(QByteArray());
+#endif
+
     mInputBaseName.clear();
 
     mResults.clear();
@@ -118,6 +124,10 @@ void ResultViewer::loadContent(Scanner* scanner)
     mReport.clear();
     scanner->getReport(mReport);
 
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+    mWebView->setContent(mReport);
+#endif
+
     mResults.clear();
     scanner->getResults(mResults);
 
@@ -132,16 +142,9 @@ const QByteArray& ResultViewer::getARF() const
 
 void ResultViewer::saveReport()
 {
-    const QString filename = QFileDialog::getSaveFileName(this,
-        QObject::tr("Save Report (HTML)"),
-        QObject::tr("%1-xccdf.report.html").arg(mInputBaseName),
-        QObject::tr("HTML Report (*.html)"), 0
-#ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
-        , QFileDialog::DontUseNativeDialog
-#endif
-    );
+    const QString filename = QFileDialog::getSaveFileName(this, "Save Report (HTML)", QString("%1-xccdf.report.html").arg(mInputBaseName), "HTML Report (*.html)");
 
-    if (filename.isEmpty())
+    if (filename == QString::Null())
         return;
 
     QFile file(filename);
@@ -152,55 +155,22 @@ void ResultViewer::saveReport()
 
 void ResultViewer::openReport()
 {
-    if (mReportFile)
-    {
-        delete mReportFile;
-        mReportFile = 0;
-    }
+    mReportFile.open();
+    mReportFile.write(mReport);
+    mReportFile.flush();
 
-    mReportFile = new QTemporaryFile();
-    mReportFile->setFileTemplate(mReportFile->fileTemplate() + ".html");
-    mReportFile->open();
-    mReportFile->write(mReport);
-    mReportFile->flush();
-    mReportFile->close();
+    QDesktopServices::openUrl(QUrl::fromLocalFile(mReportFile.fileName()));
 
-    openUrlGuarded(QUrl::fromLocalFile(mReportFile->fileName()));
+    mReportFile.close();
 
-    // the temporary file will be destroyed when SCAP Workbench closes or after another one is requested
-}
-
-
-void ResultViewer::generateBashRemediationRole()
-{
-    BashResultRemediationSaver remediation(this, mARF);
-    remediation.selectFilenameAndSaveRole();
-}
-
-void ResultViewer::generateAnsibleRemediationRole()
-{
-    AnsibleResultRemediationSaver remediation(this, mARF);
-    remediation.selectFilenameAndSaveRole();
-}
-
-void ResultViewer::generatePuppetRemediationRole()
-{
-    PuppetResultRemediationSaver remediation(this, mARF);
-    remediation.selectFilenameAndSaveRole();
+    // the temporary file will be destroyed when scap-workbench closes
 }
 
 void ResultViewer::saveResults()
 {
-    const QString filename = QFileDialog::getSaveFileName(this,
-        QObject::tr("Save as XCCDF Results"),
-        QObject::tr("%1-xccdf.results.xml").arg(mInputBaseName),
-        QObject::tr("XCCDF Results (*.xml)"), 0
-#ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
-        , QFileDialog::DontUseNativeDialog
-#endif
-    );
+    const QString filename = QFileDialog::getSaveFileName(this, "Save as XCCDF Results", QString("%1-xccdf.results.xml").arg(mInputBaseName), "XCCDF Results (*.xml)");
 
-    if (filename.isEmpty())
+    if (filename == QString::Null())
         return;
 
     QFile file(filename);
@@ -211,20 +181,28 @@ void ResultViewer::saveResults()
 
 void ResultViewer::saveARF()
 {
-    const QString filename = QFileDialog::getSaveFileName(this,
-        QObject::tr("Save as Result DataStream / ARF"),
-        QObject::tr("%1-arf.xml").arg(mInputBaseName),
-        QObject::tr("Result DataStream / ARF (*.xml)"), 0
-#ifndef SCAP_WORKBENCH_USE_NATIVE_FILE_DIALOGS
-        , QFileDialog::DontUseNativeDialog
-#endif
-    );
+    const QString filename = QFileDialog::getSaveFileName(this, "Save as Result DataStream / ARF", QString("%1-arf.xml").arg(mInputBaseName), "Result DataStream / ARF (*.xml)");
 
-    if (filename.isEmpty())
+    if (filename == QString::Null())
         return;
 
     QFile file(filename);
     file.open(QIODevice::WriteOnly);
     file.write(mARF);
     file.close();
+}
+
+
+void ResultViewer::webViewLinkClicked(const QUrl& url)
+{
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+    if (!url.isRelative())
+        QMessageBox::information(this, "External URL handling", "Sorry, but external URLs can't be followed from within scap-workbench.");
+    else if (!url.path().isEmpty())
+        QMessageBox::information(this, "Relative URL handling", "Sorry, but this web viewer will not follow any pages other than what's already loaded (only fragment URLs are allowed).");
+
+    const QString fragment = url.fragment();
+
+    mWebView->page()->currentFrame()->scrollToAnchor(fragment);
+#endif
 }

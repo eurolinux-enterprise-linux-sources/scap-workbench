@@ -31,15 +31,12 @@ class OscapScannerRemoteSsh : public OscapScannerBase
     Q_OBJECT
 
     public:
-        static void splitTarget(const QString& in, QString& target, unsigned short& port);
-
         OscapScannerRemoteSsh();
         virtual ~OscapScannerRemoteSsh();
 
         virtual void setTarget(const QString& target);
         virtual void setSession(ScanningSession* session);
 
-        virtual QStringList getCommandLineArgs() const;
         virtual void evaluate();
 
     private:

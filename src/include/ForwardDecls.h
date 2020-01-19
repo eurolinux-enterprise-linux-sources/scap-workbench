@@ -25,34 +25,19 @@
 #include "Config.h"
 
 class Application;
-class CommandLineArgsDialog;
 class DiagnosticsDialog;
 class MainWindow;
-class OscapCapabilities;
 class OscapScannerBase;
 class OscapScannerLocal;
 class OscapScannerRemoteSsh;
-class ProfilePropertiesDockWidget;
-class ProfileTitleChangeUndoCommand;
-class ProfileDescriptionChangeUndoCommand;
-class RemoteMachineComboBox;
 class ResultViewer;
-class RPMOpenHelper;
-class RuleResultItem;
-class RuleResultsTree;
 class SaveAsRPMDialog;
 class ScanningSession;
 class Scanner;
 class SshConnection;
 class SshSyncProcess;
-class ScpSyncProcess;
 class SyncProcess;
-class SSGIntegrationDialog;
 class TailoringWindow;
-class TailorProfileDialog;
 class TemporaryDir;
-class XCCDFItemPropertiesDockWidget;
-class XCCDFItemSelectUndoCommand;
-class XCCDFValueChangeUndoCommand;
 
 #endif

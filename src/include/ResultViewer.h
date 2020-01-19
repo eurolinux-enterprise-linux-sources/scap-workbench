@@ -24,11 +24,16 @@
 
 #include "ForwardDecls.h"
 
-#include <QWidget>
+#include <QDialog>
 #include <QTemporaryFile>
 #include <QUrl>
 #include <QMenu>
-#include <QLabel>
+
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+#    include <QWebView>
+#else
+#    include <QLabel>
+#endif
 
 extern "C"
 {
@@ -42,12 +47,12 @@ extern "C"
  *
  * This is a final class and is not supposed to be inherited.
  */
-class ResultViewer : public QWidget
+class ResultViewer : public QDialog
 {
     Q_OBJECT
 
     public:
-        explicit ResultViewer(QWidget* parent = 0);
+        ResultViewer(QWidget* parent = 0);
         virtual ~ResultViewer();
 
         /**
@@ -77,12 +82,20 @@ class ResultViewer : public QWidget
         /// Pops up a save dialog for ARF / result datastream
         void saveARF();
 
-        /// Pops up a save dialog for a bash remediation
-        void generateBashRemediationRole();
-        /// Pops up a save dialog for an ansible remediation
-        void generateAnsibleRemediationRole();
-        /// Pops up a save dialog for a puppet remediation
-        void generatePuppetRemediationRole();
+        /**
+         * @brief Helper method that follows anchors
+         *
+         * We load HTML from byte arrays and not from files so base URL is missing
+         * completely. That's why we have to handle this with custom code.
+         *
+         * Presently, only pure fragment URLs are supported ("#fragment"), all else
+         * pops up a message box explaining the situation.
+         *
+         * @internal
+         * This can't be guarded with SCAP_WORKBENCH_USE_WEBKIT macro because Qt's
+         * moc would otherwise ignore it.
+         */
+        void webViewLinkClicked(const QUrl& url);
 
     private:
         Ui_ResultViewer mUI;
@@ -92,12 +105,18 @@ class ResultViewer : public QWidget
         QAction* mSaveReportAction;
         QMenu* mSaveMenu;
 
+#ifdef SCAP_WORKBENCH_USE_WEBKIT
+        QWebView* mWebView;
+#else
+        QLabel* mNoWebKitNotification;
+#endif
+
         QString mInputBaseName;
 
         QByteArray mResults;
         QByteArray mReport;
         /// If user requests to open the file via desktop services
-        QTemporaryFile* mReportFile;
+        QTemporaryFile mReportFile;
         QByteArray mARF;
 };
 

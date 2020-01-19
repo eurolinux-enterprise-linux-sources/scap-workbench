@@ -23,11 +23,9 @@
 #define SCAP_WORKBENCH_SCANNING_SESSION_H_
 
 #include "ForwardDecls.h"
-
 #include <QTemporaryFile>
 #include <QSet>
 #include <QDir>
-#include <map>
 
 extern "C"
 {
@@ -42,11 +40,6 @@ class ScanningSession
     public:
         ScanningSession();
         ~ScanningSession();
-
-        /**
-         * @brief Sets whether openscap validation should be skipped when loading
-         */
-        void setSkipValid(bool skipValid);
 
         /**
          * @brief Retrieves the internal xccdf_session structure
@@ -65,13 +58,11 @@ class ScanningSession
 
         /**
          * @brief Closes currently opened file (if any)
-         *
-         * @throws Does not throw exceptions!
          */
         void closeFile();
 
         /**
-         * @brief Retrieves full absolute path of the opened file
+         * @brief Retrieves path of the opened file
          */
         QString getOpenedFilePath() const;
 
@@ -131,14 +122,6 @@ class ScanningSession
         QString getComponentID() const;
 
         /**
-         * @brief Retrieves title of effective benchmark that will be used for evaluation
-         *
-         * In case just an XCCDF file is loaded the title is of the benchmark in that XCCDF file.
-         * In case a SDS is loaded the title of the benchmark in selected datastream and component is returned.
-         */
-        QString getBenchmarkTitle() const;
-
-        /**
          * @brief Removes all tailoring (including the tailoring loaded from a file!)
          *
          * The result scanning session will scan as if only the input file was loaded.
@@ -149,13 +132,8 @@ class ScanningSession
 
         /**
          * @brief Saves tailoring to given file path
-         *
-         * @param userFile if true, the path will be kept as a user provided
-         * path for the current tailoring file
-         *
-         * @see getUserTailoringFilePath
          */
-        void saveTailoring(const QString& path, bool userFile);
+        void saveTailoring(const QString& path);
 
         /**
          * @brief Exports tailoring file to a temporary path and returns the path
@@ -168,31 +146,6 @@ class ScanningSession
         QString getTailoringFilePath();
 
         /**
-         * @brief Returns the path of tailoring file most suitable for user presentation
-         *
-         * @par
-         * This method returns the most friendly path for the user.
-         * If a tailoring file has been loaded or saved by user, its path will be returned.
-         * If a profile has been tailored but not saved yet, a temporary path is returned.
-         * If there is no tailoring, an empty string is returned.
-         */
-        QString getUserTailoringFilePath();
-
-        /**
-         * @brief Generates guide and saves it to supplied path
-         */
-        void generateGuide(const QString& path);
-
-        /**
-         * @brief Exports guide to a temporary path and returns the path
-         *
-         * If called multiple times the temporary file is overwritten, at most
-         * one temporary file will be created by this method. The file is destroyed
-         * when ScanningSession is destroyed.
-         */
-        QString getGuideFilePath();
-
-        /**
          * @brief Returns true if tailoring has been created and is valid
          *
          * @note A tailoring with 0 profiles isn't valid, the method will return false in that case
@@ -201,39 +154,13 @@ class ScanningSession
         bool hasTailoring() const;
 
         /**
-         * @brief Returns a map of profile IDs that are available for selection
-         *
-         * IDs are mapped to respective profiles.
-         *
-         * Changing component ID and/or tailoring does invalidate the map. Available
-         * profiles will change if tailoring or benchmark changes.
-         *
-         * @see setProfile
-         */
-        std::map<QString, struct xccdf_profile*> getAvailableProfiles();
-
-        /**
          * @brief Sets which profile to use for scanning
          *
-         * Will throw an exception if profile selection fails.
-         *
-         * @see getAvailableProfiles
+         * Will throw an exception if profile selection fails
          */
-        void setProfile(const QString& profileID);
+        void setProfileID(const QString& profileID);
+        QString getProfileID() const;
 
-        /**
-         * @brief Retrieves currently selected profile for scanning
-         *
-         * @see setProfile
-         */
-        QString getProfile() const;
-
-        /**
-         * @brief Checks whether a profile is selected
-         *
-         * (default) profile doesn't count as a profile in this method. This method
-         * checks whether a profile other than (default) profile is selected.
-         */
         bool profileSelected() const;
 
         /**
@@ -264,12 +191,9 @@ class ScanningSession
          * @brief Creates a new profile, makes it inherit current profile
          *
          * @param shadowed if true the new profile will have the same ID
-         * @param newIdBase ID of the new profile, only applicable if @a shadowed is false
          * @return created profile (can be passed to TailoringWindow for further tailoring)
          */
-        struct xccdf_profile* tailorCurrentProfile(bool shadowed, const QString& newIdBase);
-
-        const struct xccdf_version_info* getXCCDFVersionInfo();
+        struct xccdf_profile* tailorCurrentProfile(bool shadowed = false);
 
     private:
         struct xccdf_benchmark* getXCCDFInputBenchmark();
@@ -282,11 +206,6 @@ class ScanningSession
 
         /// Temporary file provides auto deletion and a valid temp file path
         QTemporaryFile mTailoringFile;
-        /// Temporary file provides auto deletion and a valid temp file path
-        QTemporaryFile mGuideFile;
-
-        /// Whether or not validation should be skipped
-        bool mSkipValid;
 
         /// If true, the session will be reloaded
         mutable bool mSessionDirty;
@@ -294,9 +213,6 @@ class ScanningSession
         /// (loading new file, setting it to load from datastream, ...)
         /// user changes to the tailoring would be lost if we reloaded.
         bool mTailoringUserChanges;
-
-        QString mUserTailoringFile;
-        QString mUserTailoringCID;
 };
 
 #endif

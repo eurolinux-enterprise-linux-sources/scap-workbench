@@ -21,34 +21,19 @@
 
 #include "Application.h"
 #include "MainWindow.h"
-#include "Utils.h"
 
 #include <QFileInfo>
-#include <QTranslator>
-
-#include <iostream>
 
 Application::Application(int& argc, char** argv):
     QApplication(argc, argv),
-
-    mShouldQuit(false),
-    mTranslator(),
-    mMainWindow(0)
+    mMainWindow(new MainWindow())
 {
-    setOrganizationName("SCAP Workbench upstream");
-    setOrganizationDomain("https://www.open-scap.org/tools/scap-workbench");
-
-    setApplicationName("SCAP Workbench");
+    setApplicationName("scap-workbench");
     setApplicationVersion(SCAP_WORKBENCH_VERSION);
 
-    mMainWindow = new MainWindow();
+    QString iconPath = qgetenv("SCAP_WORKBENCH_ICON");
+    QIcon icon = QIcon(iconPath.isEmpty() ? SCAP_WORKBENCH_ICON : iconPath);
 
-#if (QT_VERSION >= QT_VERSION_CHECK(4, 8, 0))
-    mTranslator.load(QLocale(), "scap-workbench", "", getShareTranslationDirectory().absolutePath());
-    installTranslator(&mTranslator);
-#endif
-
-    const QIcon& icon = getApplicationIcon();
     setWindowIcon(icon);
     mMainWindow->setWindowIcon(icon);
 
@@ -56,121 +41,33 @@ Application::Application(int& argc, char** argv):
         this, SIGNAL(lastWindowClosed()),
         this, SLOT(quit())
     );
-    mMainWindow->show();
 
     QStringList args = arguments();
-    processCLI(args);
-
-    if (mShouldQuit)
+    if (args.length() > 1)
     {
-        mMainWindow->closeMainWindowAsync();
-        return;
+        // The last argument will hold the path to file that user wants to open.
+        // For now we just ignore all other options.
+
+        mMainWindow->openFile(args.last());
+    }
+    else
+    {
+        // No arguments given, lets check if there is any default content to open.
+
+        const QString defaultContent = SCAP_WORKBENCH_DEFAULT_CONTENT;
+
+        // We silently ignore badly configured default content paths and avoid
+        // opening them.
+        if (!defaultContent.isEmpty() && QFileInfo(defaultContent).isFile())
+            mMainWindow->openFile(defaultContent);
     }
 
-    // Only open default content if no file to open was given.
+    // When all else fails, we just show the open file dialog.
     if (!mMainWindow->fileOpened())
-        openSSG();
-
+        mMainWindow->openFileDialogAsync();
 }
 
 Application::~Application()
 {
     delete mMainWindow;
-}
-
-void Application::processCLI(QStringList& args)
-{
-    if (args.contains("-V") || args.contains("--version"))
-    {
-        printVersion();
-        mShouldQuit = true;
-        return;
-    }
-
-    if (args.contains("-h") || args.contains("--help"))
-    {
-        printHelp();
-        mShouldQuit = true;
-        return;
-    }
-
-    if (args.contains("--skip-valid"))
-    {
-        mMainWindow->setSkipValid(true);
-        args.removeAll("--skip-valid");
-    }
-
-    QString tailoringFile("");
-
-    if (args.contains("--tailoring"))
-    {
-        const int index = args.indexOf("--tailoring");
-        if (index + 1 >= args.length())
-        {
-            std::cout << "--tailoring should be followed by the tailoring file path" << std::endl;
-            printHelp();
-            mShouldQuit = true;
-        }
-        else
-        {
-            tailoringFile = args.at(index + 1);
-            args.removeAt(index + 1);
-            args.removeAt(index);
-        }
-    }
-
-    if (args.length() > 1)
-    {
-        QStringList unknownOptions = args.filter(QRegExp("^-{1,2}.*"));
-
-        if (!unknownOptions.isEmpty())
-        {
-            QString unknownOption = QString("Unknown option '%1'\n").arg(unknownOptions.first());
-            std::cout << unknownOption.toUtf8().constData();
-            printHelp();
-            mShouldQuit = true;
-            return;
-        }
-
-        // For now we just ignore all other arguments.
-        mMainWindow->openFile(args.last());
-
-        if (!tailoringFile.isEmpty())
-            mMainWindow->openTailoringFile(tailoringFile);
-    }
-    else if (!tailoringFile.isEmpty())
-    {
-        std::cout << "Tailoring file was provided via --tailoring but no SCAP input was provided. Ignoring the tailoring file." << std::endl;
-    }
-}
-
-void Application::openSSG()
-{
-    mMainWindow->openSSGDialog(QObject::tr("Close SCAP Workbench"));
-}
-
-void Application::browseForContent()
-{
-    mMainWindow->openFileDialogAsync();
-}
-
-void Application::printVersion()
-{
-    const QString versionInfo = QString("SCAP Workbench %1\n").arg(SCAP_WORKBENCH_VERSION);
-    std::cout << versionInfo.toUtf8().constData();
-}
-
-void Application::printHelp()
-{
-    const QString help = QString(
-            "Usage: ./scap-workbench [options] [file]\n"
-            "\nOptions:\n"
-            "   -h, --help\r\t\t\t\t Displays this help.\n"
-            "   -V, --version\r\t\t\t\t Displays version information.\n"
-            "   --skip-valid\r\t\t\t\t Skips OpenSCAP validation.\n"
-            "   --tailoring TAILORING_FILE\r\t\t\t\t Opens given tailoring file after the given XCCDF or SDS file is loaded.\n"
-            "\nArguments:\n"
-            "   file\r\t\t\t\t A file to load, can be an XCCDF or SDS file.\n");
-
-    std::cout << help.toUtf8().constData();
 }

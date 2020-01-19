@@ -109,17 +109,11 @@ void SyncProcess::setEnvironment(const QProcessEnvironment& env)
 
 void SyncProcess::setWorkingDirectory(const QString& dir)
 {
-    if (isRunning())
-        throw SyncProcessException("Already running, can't change working directory!");
-
     mWorkingDirectory = dir;
 }
 
 void SyncProcess::setCancelRequestSource(bool* source)
 {
-    // Changing this while running is nasty but should work.
-    // Especially in a synchronized single threaded environment.
-
     mCancelRequestSource = source;
 }
 
@@ -128,7 +122,7 @@ void SyncProcess::run()
     mDiagnosticInfo = "";
 
     QProcess process(this);
-    mDiagnosticInfo += QObject::tr("Starting process '%1'\n").arg(generateDescription());
+    mDiagnosticInfo += QString("Starting process '") + generateDescription() + QString("'\n");
     startQProcess(process);
 
     mRunning = true;
@@ -140,7 +134,7 @@ void SyncProcess::run()
 
         if (wasCancelRequested())
         {
-            mDiagnosticInfo += QObject::tr("Cancel was requested! Sending terminate signal to the process...\n");
+            mDiagnosticInfo += "Cancel was requested! Sending terminate signal to the process...\n";
 
             // TODO: On Windows we have to kill immediately, terminate() posts WM_CLOSE
             //       but oscap doesn't have any event loop running.
@@ -160,7 +154,7 @@ void SyncProcess::run()
 
             if (termWaited > mTermLimit)
             {
-                mDiagnosticInfo += QObject::tr("Process had to be killed! Didn't terminate after %1 msec of waiting.\n").arg(termWaited);
+                mDiagnosticInfo += QString("Process had to be killed! Didn't terminate after %1 msec of waiting.\n").arg(termWaited);
                 process.kill();
                 break;
             }
@@ -169,8 +163,8 @@ void SyncProcess::run()
 
     mRunning = false;
 
-    mStdOutContents = QString::fromLocal8Bit(process.readAllStandardOutput());
-    mStdErrContents = QString::fromLocal8Bit(process.readAllStandardError());
+    mStdOutContents = process.readAllStandardOutput();
+    mStdErrContents = process.readAllStandardError();
 
     // TODO: We are duplicating data here!
     mDiagnosticInfo += "stdout:\n===============================\n" + QString(mStdOutContents) + QString("\n");
@@ -179,12 +173,9 @@ void SyncProcess::run()
     mExitCode = process.exitCode();
 }
 
-QDialog* SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title,
-    bool showCancelButton, bool closeAfterFinished, bool modal)
+void SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title, bool showCancelButton, bool closeAfterFinished)
 {
     ProcessProgressDialog* dialog = new ProcessProgressDialog(widgetParent);
-    dialog->setModal(modal);
-
     QObject::connect(
         dialog, SIGNAL(rejected()),
         this, SLOT(cancel())
@@ -196,7 +187,7 @@ QDialog* SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title,
 
     QProcess process(this);
     process.setProcessChannelMode(QProcess::MergedChannels);
-    mDiagnosticInfo += QObject::tr("Starting process '%1'\n").arg(generateDescription());
+    mDiagnosticInfo += QString("Starting process '") + generateDescription() + QString("'\n");
     startQProcess(process);
 
     mRunning = true;
@@ -210,7 +201,7 @@ QDialog* SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title,
 
         if (wasCancelRequested())
         {
-            mDiagnosticInfo += QObject::tr("Cancel was requested! Sending terminate signal to the process...\n");
+            mDiagnosticInfo += "Cancel was requested! Sending terminate signal to the process...\n";
 
             // TODO: On Windows we have to kill immediately, terminate() posts WM_CLOSE
             //       but oscap doesn't have any event loop running.
@@ -230,7 +221,7 @@ QDialog* SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title,
 
             if (termWaited > mTermLimit)
             {
-                mDiagnosticInfo += QObject::tr("Process had to be killed! Didn't terminate after %1 msec of waiting.\n").arg(termWaited);
+                mDiagnosticInfo += QString("Process had to be killed! Didn't terminate after %1 msec of waiting.\n").arg(termWaited);
                 process.kill();
                 break;
             }
@@ -253,8 +244,6 @@ QDialog* SyncProcess::runWithDialog(QWidget* widgetParent, const QString& title,
 
     if (closeAfterFinished)
         dialog->done(QDialog::Accepted);
-
-    return dialog;
 }
 
 void SyncProcess::cancel()
@@ -265,19 +254,6 @@ void SyncProcess::cancel()
 bool SyncProcess::isRunning() const
 {
     return mRunning;
-}
-
-void SyncProcess::setStdInFile(const QString& path)
-{
-    if (isRunning())
-        throw SyncProcessException("Can't set stdin file when the process is running!");
-
-    mStdInFile = path;
-}
-
-const QString& SyncProcess::getStdInFile() const
-{
-    return mStdInFile;
 }
 
 int SyncProcess::getExitCode() const
@@ -314,21 +290,11 @@ const QString& SyncProcess::getDiagnosticInfo() const
 
 void SyncProcess::startQProcess(QProcess& process)
 {
-    const QString command = generateFullCommand();
-    if (command.isEmpty())
-        throw SyncProcessException("Cannot start process '" + generateDescription() + "'. The full command is '" + command + "'.");
-
-    if (!mStdInFile.isEmpty())
-        process.setStandardInputFile(mStdInFile);
-
     process.setProcessEnvironment(generateFullEnvironment());
-    mDiagnosticInfo += QObject::tr("Starting process '%1'\n").arg(generateDescription());
+    mDiagnosticInfo += QString("Starting process '") + generateDescription() + QString("'\n");
+    process.setStandardInputFile("/dev/null");
     process.setWorkingDirectory(mWorkingDirectory);
-    process.start(command, generateFullArguments());
-    process.waitForStarted();
-
-    if (process.state() != QProcess::Running)
-        throw SyncProcessException("Starting process '" + generateDescription() + "' failed. The process is not in a running state.");
+    process.start(generateFullCommand(), generateFullArguments());
 }
 
 bool SyncProcess::wasCancelRequested() const
