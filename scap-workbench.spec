@@ -3,16 +3,14 @@
 %global _pkgdocdir %{_docdir}/%{name}-%{version}
 
 Name:       scap-workbench
-Version:    1.1.4
-Release:    5%{?dist}
+Version:    1.1.6
+Release:    1%{?dist}
 Summary:    Scanning, tailoring, editing and validation tool for SCAP content
 
 License:    GPLv3+
 URL:        http://www.open-scap.org/tools/scap-workbench
 Source0:    https://github.com/OpenSCAP/scap-workbench/releases/download/%{version}/scap-workbench-%{version}.tar.bz2
 Group:      System Environment/Base
-
-Patch0:		downloading_message_stderr_1456429.patch
 
 BuildRequires:  cmake >= 2.6
 BuildRequires:  qt-devel >= 4.0.0
@@ -43,7 +41,6 @@ content. The tool is based on OpenSCAP library.
 
 %prep
 %setup -q
-%patch0 -p1
 
 %build
 %cmake -D CMAKE_INSTALL_DOCDIR=%{_pkgdocdir} .
@@ -70,6 +67,21 @@ make install DESTDIR=%{buildroot}
 %doc %{_pkgdocdir}/README.md
 
 %changelog
+* Fri Nov 10 2017 Martin Preisler <mpreisle@redhat.com> 1.1.6-1
+- Updated to new upstream release 1.1.6
+- Tri-state checkboxes for tailoring
+- Fixed remote host and port being cleared when scan starts
+- Fiixed formating of Profile html description in Tailoring Window
+- Fixed oscap message "Downloading ... ok" appearing as an error
+- Fixed tab order of widgets in main window
+- Load Content as the default button of the SSG integration dialog
+- New validation of the customization file name
+- Generate bash and Ansible remediation roles from profiles
+- Generate bash and Ansible remediation roles from results after scanning
+- Fixed a short integer overflow when using ssh port numbers higher than 32k
+- Fixed long loading times on OSX
+- Open tailoring file directly via command line
+
 * Thu Jun 01 2017 Wesley Ceraso Prudencio <wcerasop@redhat.com> - 1.1.4-5
 - Fixes resources downloading message bug
 

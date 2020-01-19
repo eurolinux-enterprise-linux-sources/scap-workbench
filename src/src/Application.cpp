@@ -32,7 +32,6 @@ Application::Application(int& argc, char** argv):
     QApplication(argc, argv),
 
     mShouldQuit(false),
-    mSkipValid(false),
     mTranslator(),
     mMainWindow(0)
 {
@@ -68,8 +67,6 @@ Application::Application(int& argc, char** argv):
         return;
     }
 
-    mMainWindow->setSkipValid(mSkipValid);
-
     // Only open default content if no file to open was given.
     if (!mMainWindow->fileOpened())
         openSSG();
@@ -99,8 +96,27 @@ void Application::processCLI(QStringList& args)
 
     if (args.contains("--skip-valid"))
     {
-        mSkipValid = true;
+        mMainWindow->setSkipValid(true);
         args.removeAll("--skip-valid");
+    }
+
+    QString tailoringFile("");
+
+    if (args.contains("--tailoring"))
+    {
+        const int index = args.indexOf("--tailoring");
+        if (index + 1 >= args.length())
+        {
+            std::cout << "--tailoring should be followed by the tailoring file path" << std::endl;
+            printHelp();
+            mShouldQuit = true;
+        }
+        else
+        {
+            tailoringFile = args.at(index + 1);
+            args.removeAt(index + 1);
+            args.removeAt(index);
+        }
     }
 
     if (args.length() > 1)
@@ -118,6 +134,13 @@ void Application::processCLI(QStringList& args)
 
         // For now we just ignore all other arguments.
         mMainWindow->openFile(args.last());
+
+        if (!tailoringFile.isEmpty())
+            mMainWindow->openTailoringFile(tailoringFile);
+    }
+    else if (!tailoringFile.isEmpty())
+    {
+        std::cout << "Tailoring file was provided via --tailoring but no SCAP input was provided. Ignoring the tailoring file." << std::endl;
     }
 }
 
@@ -145,6 +168,7 @@ void Application::printHelp()
             "   -h, --help\r\t\t\t\t Displays this help.\n"
             "   -V, --version\r\t\t\t\t Displays version information.\n"
             "   --skip-valid\r\t\t\t\t Skips OpenSCAP validation.\n"
+            "   --tailoring TAILORING_FILE\r\t\t\t\t Opens given tailoring file after the given XCCDF or SDS file is loaded.\n"
             "\nArguments:\n"
             "   file\r\t\t\t\t A file to load, can be an XCCDF or SDS file.\n");
 

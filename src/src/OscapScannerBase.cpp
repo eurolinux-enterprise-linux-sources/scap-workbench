@@ -306,6 +306,7 @@ bool OscapScannerBase::tryToReadStdOutChar(QProcess& process)
         {
             case RS_READING_PREFIX:
                 {
+                    // Openscap <= 1.2.10 (60fb9f0c98eee) sends this message through stdout
                     if (mReadBuffer=="Downloading")
                     {
                          mReadingState = RS_READING_DOWNLOAD_FILE;
@@ -331,6 +332,8 @@ bool OscapScannerBase::tryToReadStdOutChar(QProcess& process)
                 break;
             case RS_READING_DOWNLOAD_FILE:
                 {
+                    // When fetching remote content, openscap will inform scap-workbench about
+                    // resources being downloaded. Keep any colon found in URL of file being downloaded.
                     mReadBuffer.append(QChar::fromAscii(readChar));
                 }
                 break;
@@ -432,6 +435,11 @@ void OscapScannerBase::watchStdErr(QProcess& process)
             {
                 QString guiMessage = guiFriendlyMessage(stdErrOutput);
                 emit warningMessage(QObject::tr(guiMessage.toUtf8().constData()));
+            }
+            // Openscap >= 1.2.11 (60fb9f0c98eee) sends this message through stderr
+            else if (stdErrOutput.contains(QRegExp("^Downloading: .+ \\.{3} \\w+\\n")))
+            {
+                emit infoMessage(stdErrOutput);
             }
             else
             {
