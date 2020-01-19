@@ -6,22 +6,24 @@
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}-%{version}}
 
 Name:		%{?scl_prefix}scap-workbench
-Version:	0.8.6
+Version:	1.0.2
 Release:	2%{?dist}
 Summary:	Scanning, tailoring, editing and validation tool for SCAP content
 
 License:	GPLv3+
 URL:		https://fedorahosted.org/scap-workbench/
 Source0:	https://fedorahosted.org/released/scap-workbench/%{pkg_name}-%{version}.tar.bz2
+# upstreamed, can be removed with rebase to 1.0.3
+Patch0: 	scap-workbench-1.0.2-rpm-open.patch
 Group:		System Environment/Base
 
 BuildRequires:	cmake
 BuildRequires:	qt-devel
 #BuildRequires:	qtwebkit-devel
 
-BuildRequires:	%{?scl_prefix}openscap-devel >= 0.9.13
-BuildRequires:	%{?scl_prefix}openscap-utils >= 0.9.13
-Requires:		%{?scl_prefix}openscap-utils >= 0.9.13
+BuildRequires:	%{?scl_prefix}openscap-devel >= 1.0.9
+BuildRequires:	%{?scl_prefix}openscap-utils >= 1.0.9
+Requires:		%{?scl_prefix}openscap-utils >= 1.0.9
 # ssh to scan remote machines
 Requires:		openssh-clients
 Requires:		openssh-askpass
@@ -37,6 +39,7 @@ content. The tool is based on OpenSCAP library.
 
 %prep
 %setup -q -n %{pkg_name}-%{version}
+%patch0 -p1
 
 %build
 %cmake -D CMAKE_INSTALL_DOCDIR=%{_pkgdocdir} .
@@ -48,14 +51,47 @@ make install DESTDIR=%{buildroot}
 %files
 %{_bindir}/scap-workbench
 %{_datadir}/applications/scap-workbench.desktop
+%{_datadir}/scap-workbench/*.png
+%{_datadir}/scap-workbench/translations/*
 %{_libexecdir}/scap-workbench-oscap.sh
 %{_libexecdir}/scap-workbench-pkexec-oscap.sh
+%{_libexecdir}/scap-workbench-rpm-extract.sh
 %{_datadir}/polkit-1/actions/scap-workbench-oscap.policy
 %{_datadir}/pixmaps/scap-workbench.png
+%{_datadir}/pixmaps/scap-workbench.svg
+%{_datadir}/appdata/scap-workbench.appdata.xml
 %doc %{_mandir}/man8/scap-workbench.8.gz
 %doc %{_pkgdocdir}/user_manual.html
 
 %changelog
+* Tue Oct 21 2014 Martin Preisler <mpreisle@redhat.com> 1.0.2-2
+- Fix RPM open functionality, see rhbz#1154039
+
+* Wed Sep 24 2014 Martin Preisler <mpreisle@redhat.com> 1.0.2-1
+- Updated to new upstream release 1.0.2
+
+* Fri Sep 05 2014 Martin Preisler <mpreisle@redhat.com> 1.0.1-1
+- Updated to new upstream release 1.0.1
+
+* Mon Aug 18 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.0.0-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_22_Mass_Rebuild
+
+* Fri Jun 27 2014 Martin Preisler <mpreisle@redhat.com> 1.0.0-1
+- Updated to new version
+
+* Tue Jun 10 2014 Martin Preisler <mpreisle@redhat.com> 0.8.9-1
+- Updated to new version
+- appdata is now available
+
+* Sun Jun 08 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 0.8.8-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_Mass_Rebuild
+
+* Wed Mar 26 2014 Martin Preisler <mpreisle@redhat.com> 0.8.8-1
+- Updated to new version
+
+* Wed Feb 19 2014 Martin Preisler <mpreisle@redhat.com> 0.8.7-1
+- Updated to new version
+
 * Fri Jan 31 2014 Jan iankko Lieskovsky <jlieskov@redhat.com> 0.8.6-2
 - Disable the optional qtwebkit BR
 

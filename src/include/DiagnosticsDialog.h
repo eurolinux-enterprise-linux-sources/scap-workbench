@@ -34,6 +34,23 @@ extern "C"
 #include "ui_DiagnosticsDialog.h"
 
 /**
+ * @brief Messages are divided into categories.
+ *
+ * Info is not important and does not make the DiagnosticDialog pop up.
+ * All the other categories cause the dialog to be shown.
+ *
+ * This enum is not used directly but only internally. You are advised
+ * to use the {info,warning,exception,error}Message methods.
+ */
+enum MessageSeverity
+{
+    MS_INFO,
+    MS_WARNING,
+    MS_EXCEPTION,
+    MS_ERROR
+};
+
+/**
  * @brief Workbench displays errors and warnings, this dialog groups them
  *
  * This is a final class and is not supposed to be inherited.
@@ -43,13 +60,20 @@ class DiagnosticsDialog : public QDialog
     Q_OBJECT
 
     public:
-        DiagnosticsDialog(QWidget* parent = 0);
+        explicit DiagnosticsDialog(QWidget* parent = 0);
         virtual ~DiagnosticsDialog();
 
         /**
          * @brief Clears all kept content
          */
         void clear();
+
+        /**
+         * @brief Blocks execution until user hides this dialog
+         *
+         * @param interval Polling interval in msec
+         */
+        void waitUntilHidden(unsigned int interval = 100);
 
     public slots:
         /**
@@ -79,10 +103,26 @@ class DiagnosticsDialog : public QDialog
          */
         void errorMessage(const QString& message);
 
+        /**
+         * @brief Report a caught exception.
+         */
+        void exceptionMessage(const std::exception& e, const QString& context = "");
+
     private:
-        void pushMessage(const QString& fullMessage, const bool error = false);
+        void pushMessage(MessageSeverity severity, const QString& fullMessage);
+
+        /**
+         * @brief Pushes a single info message containing version info
+         */
+        void dumpVersionInfo();
 
         Ui_DiagnosticsDialog mUI;
+
+    private slots:
+        /**
+         * @brief Copies plain text log to system clipboard, useful for bug reports
+         */
+        void copyToClipboard();
 };
 
 #endif

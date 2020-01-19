@@ -24,8 +24,8 @@
 
 #include "ForwardDecls.h"
 
-#include <QDialog>
-#include <QUndoCommand>
+#include <QMainWindow>
+#include <QSettings>
 #include <QUndoStack>
 
 extern "C"
@@ -38,137 +38,6 @@ extern "C"
 #include "ui_ProfilePropertiesDockWidget.h"
 #include "ui_XCCDFItemPropertiesDockWidget.h"
 
-class TailoringWindow;
-
-/**
- * @brief Displays profile properties and allows editing of profile title
- */
-class ProfilePropertiesDockWidget : public QDockWidget
-{
-    Q_OBJECT
-
-    public:
-        ProfilePropertiesDockWidget(TailoringWindow* window, QWidget* parent = 0);
-        virtual ~ProfilePropertiesDockWidget();
-
-        /**
-         * @brief Takes profile's current ID and title and sets both QLineEdit widgets accordingly
-         */
-        void refresh();
-
-    protected slots:
-        void profileTitleChanged(const QString& newTitle);
-        void profileDescriptionChanged();
-
-    protected:
-        /// Prevents a redo command being created when actions are undone or redone
-        bool mRefreshInProgress;
-
-        /// UI designed in Qt Designer
-        Ui_ProfilePropertiesDockWidget mUI;
-
-        /// Owner TailoringWindow that provides profile for editing/viewing
-        TailoringWindow* mWindow;
-};
-
-/**
- * @brief Provides reference about currently selected XCCDF item
- */
-class XCCDFItemPropertiesDockWidget : public QDockWidget
-{
-    Q_OBJECT
-
-    public:
-        XCCDFItemPropertiesDockWidget(QWidget* parent = 0);
-        virtual ~XCCDFItemPropertiesDockWidget();
-
-        /**
-         * @brief Changes currently inspected XCCDF item
-         *
-         * @note This method automatically calls refresh to load new data
-         */
-        void setXccdfItem(struct xccdf_item* item);
-
-        /**
-         * @brief Loads properties from currently set XCCDF items and sets widgets accordingly
-         */
-        void refresh();
-
-    protected:
-        /// UI designed in Qt Designer
-        Ui_XCCDFItemPropertiesDockWidget mUI;
-
-        /// Currently inspected XCCDF item
-        struct xccdf_item* mXccdfItem;
-};
-
-/**
- * @brief Stores info about one selection or deselection of an XCCDF item
- */
-class XCCDFItemSelectUndoCommand : public QUndoCommand
-{
-    public:
-        XCCDFItemSelectUndoCommand(TailoringWindow* window, QTreeWidgetItem* item, bool newSelect);
-        virtual ~XCCDFItemSelectUndoCommand();
-
-        virtual int id() const;
-
-        virtual void redo();
-        virtual void undo();
-
-    private:
-        TailoringWindow* mWindow;
-
-        QTreeWidgetItem* mTreeItem;
-        /// selection state after this undo command is "redone" (applied)
-        bool mNewSelect;
-};
-
-/**
- * @brief Stores XCCDF profile title change undo info
- */
-class ProfileTitleChangeUndoCommand : public QUndoCommand
-{
-    public:
-        ProfileTitleChangeUndoCommand(TailoringWindow* window, const QString& oldTitle, const QString& newTitle);
-        virtual ~ProfileTitleChangeUndoCommand();
-
-        virtual int id() const;
-
-        virtual void redo();
-        virtual void undo();
-
-        virtual bool mergeWith(const QUndoCommand *other);
-
-    private:
-        TailoringWindow* mWindow;
-
-        QString mOldTitle;
-        QString mNewTitle;
-};
-
-/**
- * @brief Stores XCCDF profile description change undo info
- */
-class ProfileDescriptionChangeUndoCommand : public QUndoCommand
-{
-    public:
-        ProfileDescriptionChangeUndoCommand(TailoringWindow* window, const QString& oldDesc, const QString& newDesc);
-        virtual ~ProfileDescriptionChangeUndoCommand();
-
-        virtual int id() const;
-
-        virtual void redo();
-        virtual void undo();
-
-        virtual bool mergeWith(const QUndoCommand *other);
-
-    private:
-        TailoringWindow* mWindow;
-
-        QString mOldDesc;
-        QString mNewDesc;
-};
 /**
  * @brief Tailors given profile by editing it directly
  *
@@ -180,7 +49,12 @@ class TailoringWindow : public QMainWindow
     Q_OBJECT
 
     public:
-        TailoringWindow(struct xccdf_policy* policy, struct xccdf_benchmark* benchmark, MainWindow* parent = 0);
+        static struct xccdf_item* getXccdfItemFromTreeItem(QTreeWidgetItem* treeItem);
+
+        /**
+         * @param newProfile whether the profile in policy was created solely for tailoring
+         */
+        TailoringWindow(struct xccdf_policy* policy, struct xccdf_benchmark* benchmark, bool newProfile, MainWindow* parent = 0);
         virtual ~TailoringWindow();
 
         /**
@@ -197,6 +71,20 @@ class TailoringWindow : public QMainWindow
          * @param recursive If true synchronization is called on children of the tree item and XCCDF item as well
          */
         void synchronizeTreeItem(QTreeWidgetItem* treeItem, struct xccdf_item* xccdfItem, bool recursive);
+
+        void setValueValue(struct xccdf_value* xccdfValue, const QString& newValue);
+        void refreshXccdfItemPropertiesDockWidget();
+
+        QString getCurrentValueValue(struct xccdf_value* xccdfValue);
+        void setValueValueWithUndoCommand(struct xccdf_value* xccdfValue, const QString& newValue);
+
+    public slots:
+        /**
+         * @brief Traverses the tree into all selected groups and deselects all their items
+         */
+        void deselectAllChildrenItems(QTreeWidgetItem* parent = 0, bool undoMacro = true);
+
+    public:
 
         /**
          * @brief Retrieves ID of profile that is being tailored (in suitable language)
@@ -235,6 +123,20 @@ class TailoringWindow : public QMainWindow
         QString getProfileDescription() const;
 
         /**
+         * @brief Retrieves readable title of given XCCDF item [in HTML]
+         *
+         * @internal This method performs substitution using mPolicy
+         */
+        QString getXCCDFItemTitle(struct xccdf_item* item) const;
+
+        /**
+         * @brief Retrieves readable description of given XCCDF item [in HTML]
+         *
+         * @internal This method performs substitution using mPolicy
+         */
+        QString getXCCDFItemDescription(struct xccdf_item* item) const;
+
+        /**
          * @brief Creates a new undo command that changes description of tailored profile and pushes it onto the undo stack
          *
          * @see TailoringWindow::setProfileDescription
@@ -246,11 +148,25 @@ class TailoringWindow : public QMainWindow
          */
         void refreshProfileDockWidget();
 
-    protected:
+    public slots:
+        void confirmAndClose();
+        void deleteProfileAndDiscard();
+
+    private:
         /// Reimplemented to refresh profiles and selected rules in the parent main window
         virtual void closeEvent(QCloseEvent * event);
 
+        QString getQSettingsKey() const;
+        void deserializeCollapsedItems();
+        void serializeCollapsedItems();
+        void syncCollapsedItems();
+        void syncCollapsedItem(QTreeWidgetItem* item, QSet<QString>& usedCollapsedIds);
+
         MainWindow* mParentMainWindow;
+        /// Used to remember manually collapsed items for a particular item
+        QSet<QString> mCollapsedItemIds;
+        /// Used to serialize manually collapsed items between scap-workbench runs
+        QSettings* mQSettings;
 
         /// if > 0, ignore itemChanged signals, these would just excessively add selects and bloat memory
         unsigned int mSynchronizeItemLock;
@@ -258,8 +174,12 @@ class TailoringWindow : public QMainWindow
         /// UI designed in Qt Designer
         Ui_TailoringWindow mUI;
 
-        ProfilePropertiesDockWidget* mProfilePropertiesDockWidget;
         XCCDFItemPropertiesDockWidget* mItemPropertiesDockWidget;
+        ProfilePropertiesDockWidget* mProfilePropertiesDockWidget;
+        QDockWidget* mUndoViewDockWidget;
+
+        QLineEdit* mSearchBox;
+        QPushButton* mSearchButton;
 
         struct xccdf_policy* mPolicy;
         struct xccdf_profile* mProfile;
@@ -267,9 +187,18 @@ class TailoringWindow : public QMainWindow
 
         QUndoStack mUndoStack;
 
-    protected slots:
+        bool mNewProfile;
+        bool mChangesConfirmed;
+
+        unsigned int mSearchSkippedItems;
+        QString mSearchCurrentNeedle;
+
+    private slots:
+        void searchNext();
         void itemSelectionChanged(QTreeWidgetItem* current, QTreeWidgetItem* previous);
         void itemChanged(QTreeWidgetItem* item, int column);
+        void itemExpanded(QTreeWidgetItem* item);
+        void itemCollapsed(QTreeWidgetItem* item);
 };
 
 #endif

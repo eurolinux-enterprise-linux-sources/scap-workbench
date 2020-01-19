@@ -25,6 +25,7 @@
 #include "ProcessHelpers.h"
 
 #include <QFileDialog>
+#include <QPointer>
 #include <cassert>
 
 SaveAsRPMDialog::SaveAsRPMDialog(ScanningSession* session, QWidget* parent):
@@ -54,12 +55,19 @@ SaveAsRPMDialog::SaveAsRPMDialog(ScanningSession* session, QWidget* parent):
 SaveAsRPMDialog::~SaveAsRPMDialog()
 {}
 
+void SaveAsRPMDialog::saveSession(ScanningSession* session, QWidget* parent)
+{
+    QPointer<SaveAsRPMDialog> dialog = new SaveAsRPMDialog(session, parent);
+    dialog->exec();
+    delete dialog;
+}
+
 void SaveAsRPMDialog::slotFinished(int result)
 {
     if (result == QDialog::Rejected)
         return;
 
-    const QString targetDir = QFileDialog::getExistingDirectory(this, "Select target directory");
+    const QString targetDir = QFileDialog::getExistingDirectory(this, QObject::tr("Select target directory"));
     if (targetDir.isEmpty())
         return; // user canceled
 
@@ -132,5 +140,7 @@ void SaveAsRPMDialog::slotFinished(int result)
 
     scapAsRPM.setArguments(args);
 
-    scapAsRPM.runWithDialog(this, "Saving SCAP content as RPM...", true, false);
+    QPointer<QDialog> dialog = scapAsRPM.runWithDialog(this, QObject::tr("Saving SCAP content as RPM..."), true, false);
+    dialog->exec();
+    delete dialog;
 }

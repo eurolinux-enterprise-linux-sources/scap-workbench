@@ -26,6 +26,7 @@ Scanner::Scanner():
     mScannerMode(SM_SCAN),
     mScanThread(0),
     mMainThread(0),
+    mSkipValid(false),
     mSession(0),
     mTarget("")
 {}
@@ -41,6 +42,16 @@ void Scanner::setScanThread(QThread* thread)
 void Scanner::setMainThread(QThread* thread)
 {
     mMainThread = thread;
+}
+
+void Scanner::setSkipValid(bool skip)
+{
+    mSkipValid = skip;
+}
+
+bool Scanner::getSkipValid() const
+{
+    return mSkipValid;
 }
 
 void Scanner::setSession(ScanningSession* session)
@@ -95,7 +106,7 @@ void Scanner::evaluateExceptionGuard()
     catch (const std::exception& e)
     {
         emit errorMessage(
-            QString("Exception was thrown while evaluating! Details follow:\n%1").arg(QString::fromUtf8(e.what())));
+            QObject::tr("Exception was thrown while evaluating! Details follow:\n%1").arg(QString::fromUtf8(e.what())));
         signalCompletion(true);
     }
 }

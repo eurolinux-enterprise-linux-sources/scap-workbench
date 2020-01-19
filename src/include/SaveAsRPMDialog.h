@@ -27,15 +27,31 @@
 #include <QDialog>
 #include "ui_SaveAsRPMDialog.h"
 
+/**
+ * @brief Provides options such as package name, version, summary, etc... when saving SCAP as RPM
+ *
+ * Internally this uses the scap-as-rpm script shipped in openscap.
+ *
+ * @note Please use the SaveAsRPMDialog::saveSession static method where possible.
+ */
 class SaveAsRPMDialog : public QDialog
 {
     Q_OBJECT
 
-    public:
-        SaveAsRPMDialog(ScanningSession* session, QWidget* parent = 0);
+    private:
+        explicit SaveAsRPMDialog(ScanningSession* session, QWidget* parent = 0);
         virtual ~SaveAsRPMDialog();
 
-    protected slots:
+    public:
+        /**
+         * @brief Provides a dialog to the user to save given session
+         *
+         * @param session Session to save
+         * @param parent Parent Qt widget, usually the main window
+         */
+        static void saveSession(ScanningSession* session, QWidget* parent = 0);
+
+    private slots:
         void slotFinished(int result);
 
     private:

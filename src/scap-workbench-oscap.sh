@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Copyright 2014 Red Hat Inc., Durham, North Carolina.
 # All Rights Reserved.
@@ -84,24 +84,22 @@ RET=$?
 
 popd > /dev/null
 
-chown -R $wrapper_uid:$wrapper_gid "$TEMP_DIR"
-
-function sudo_copy
+function chown_copy
 {
     local what=$1
     local where=$2
 
-    # sudo only required if wrapper_{uid,gid} differs from real_{uid,gid}
+    [ ! -f "$what" ] || cp "$what" "$where"
+
+    # chown only required if wrapper_{uid,gid} differs from real_{uid,gid}
     if [ $wrapper_uid -ne $real_uid ] || [ $wrapper_gid -ne $real_gid ]; then
-        sudo -u \#$wrapper_uid -g \#$wrapper_gid [ ! -f "$what" ] || cp "$what" "$where"
-    else
-        [ ! -f "$what" ] || cp "$what" "$where"
+        chown $wrapper_uid:$wrapper_gid $where
     fi
 }
 
-sudo_copy "$TEMP_DIR/results-xccdf.xml" $TARGET_RESULTS_XCCDF
-sudo_copy "$TEMP_DIR/results-arf.xml" $TARGET_RESULTS_ARF
-sudo_copy "$TEMP_DIR/report.html" $TARGET_REPORT
+chown_copy "$TEMP_DIR/results-xccdf.xml" $TARGET_RESULTS_XCCDF
+chown_copy "$TEMP_DIR/results-arf.xml" $TARGET_RESULTS_ARF
+chown_copy "$TEMP_DIR/report.html" $TARGET_REPORT
 
 rm -r "$TEMP_DIR"
 

@@ -23,9 +23,11 @@
 #define SCAP_WORKBENCH_SCANNING_SESSION_H_
 
 #include "ForwardDecls.h"
+
 #include <QTemporaryFile>
 #include <QSet>
 #include <QDir>
+#include <map>
 
 extern "C"
 {
@@ -58,11 +60,13 @@ class ScanningSession
 
         /**
          * @brief Closes currently opened file (if any)
+         *
+         * @throws Does not throw exceptions!
          */
         void closeFile();
 
         /**
-         * @brief Retrieves path of the opened file
+         * @brief Retrieves full absolute path of the opened file
          */
         QString getOpenedFilePath() const;
 
@@ -122,6 +126,14 @@ class ScanningSession
         QString getComponentID() const;
 
         /**
+         * @brief Retrieves title of effective benchmark that will be used for evaluation
+         *
+         * In case just an XCCDF file is loaded the title is of the benchmark in that XCCDF file.
+         * In case a SDS is loaded the title of the benchmark in selected datastream and component is returned.
+         */
+        QString getBenchmarkTitle() const;
+
+        /**
          * @brief Removes all tailoring (including the tailoring loaded from a file!)
          *
          * The result scanning session will scan as if only the input file was loaded.
@@ -154,13 +166,39 @@ class ScanningSession
         bool hasTailoring() const;
 
         /**
+         * @brief Returns a map of profile IDs that are available for selection
+         *
+         * IDs are mapped to respective profiles.
+         *
+         * Changing component ID and/or tailoring does invalidate the map. Available
+         * profiles will change if tailoring or benchmark changes.
+         *
+         * @see setProfile
+         */
+        std::map<QString, struct xccdf_profile*> getAvailableProfiles();
+
+        /**
          * @brief Sets which profile to use for scanning
          *
-         * Will throw an exception if profile selection fails
+         * Will throw an exception if profile selection fails.
+         *
+         * @see getAvailableProfiles
          */
-        void setProfileID(const QString& profileID);
-        QString getProfileID() const;
+        void setProfile(const QString& profileID);
 
+        /**
+         * @brief Retrieves currently selected profile for scanning
+         *
+         * @see setProfile
+         */
+        QString getProfile() const;
+
+        /**
+         * @brief Checks whether a profile is selected
+         *
+         * (default) profile doesn't count as a profile in this method. This method
+         * checks whether a profile other than (default) profile is selected.
+         */
         bool profileSelected() const;
 
         /**
@@ -191,9 +229,12 @@ class ScanningSession
          * @brief Creates a new profile, makes it inherit current profile
          *
          * @param shadowed if true the new profile will have the same ID
+         * @param newIdBase ID of the new profile, only applicable if @a shadowed is false
          * @return created profile (can be passed to TailoringWindow for further tailoring)
          */
-        struct xccdf_profile* tailorCurrentProfile(bool shadowed = false);
+        struct xccdf_profile* tailorCurrentProfile(bool shadowed, const QString& newIdBase);
+
+        const struct xccdf_version_info* getXCCDFVersionInfo();
 
     private:
         struct xccdf_benchmark* getXCCDFInputBenchmark();

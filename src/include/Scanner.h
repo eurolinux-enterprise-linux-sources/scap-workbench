@@ -72,6 +72,8 @@ class Scanner : public QObject
 
         virtual void setScanThread(QThread* thread);
         virtual void setMainThread(QThread* thread);
+        virtual void setSkipValid(bool skip);
+        bool getSkipValid() const;
         virtual void setSession(ScanningSession* session);
         ScanningSession* getSession() const;
         virtual void setTarget(const QString& target);
@@ -158,14 +160,14 @@ class Scanner : public QObject
         /**
          * @brief Scanner signals this when non-critical issues happen
          *
-         * Scanning may or may not continue after this is emited.
+         * Scanning may or may not continue after this is emitted.
          */
         void warningMessage(const QString& message);
 
         /**
          * @brief Scanner signals this when critical and/or important issues happen
          *
-         * Scanning may or may not continue after this is emited.
+         * Scanning may or may not continue after this is emitted.
          */
         void errorMessage(const QString& message);
 
@@ -188,6 +190,9 @@ class Scanner : public QObject
         QThread* mScanThread;
         /// Thread that is running the main window event queue
         QThread* mMainThread;
+
+        /// If true openscap will skip validation when interpreting the content
+        bool mSkipValid;
 
         /// Session containing setup parameters for the scan
         ScanningSession* mSession;

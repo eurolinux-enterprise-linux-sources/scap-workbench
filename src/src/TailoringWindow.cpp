@@ -20,208 +20,27 @@
  */
 
 #include "TailoringWindow.h"
+#include "TailoringDockWidgets.h"
+#include "TailoringUndoCommands.h"
+
 #include "Exceptions.h"
 #include "MainWindow.h"
 #include "APIHelpers.h"
+#include "Utils.h"
 
-#include <set>
+#include <QCryptographicHash>
+#include <QMessageBox>
+#include <QCloseEvent>
+#include <QDesktopWidget>
+#include <QUndoView>
+
+#include <algorithm>
 #include <cassert>
 
-ProfilePropertiesDockWidget::ProfilePropertiesDockWidget(TailoringWindow* window, QWidget* parent):
-    QDockWidget(parent),
-
-    mRefreshInProgress(false),
-    mWindow(window)
-{
-    mUI.setupUi(this);
-
-    QObject::connect(
-        mUI.title, SIGNAL(textChanged(const QString&)),
-        this, SLOT(profileTitleChanged(const QString&))
-    );
-
-    QObject::connect(
-        mUI.description, SIGNAL(textChanged()),
-        this, SLOT(profileDescriptionChanged())
-    );
-}
-
-ProfilePropertiesDockWidget::~ProfilePropertiesDockWidget()
-{}
-
-void ProfilePropertiesDockWidget::refresh()
-{
-    if (mUI.id->text() != mWindow->getProfileID())
-        mUI.id->setText(mWindow->getProfileID());
-
-    if (mUI.title->text() != mWindow->getProfileTitle())
-    {
-        // This prevents a new undo command being spawned as a result of refreshing
-        mRefreshInProgress = true;
-        mUI.title->setText(mWindow->getProfileTitle());
-        mRefreshInProgress = false;
-    }
-
-    if (mUI.description->toPlainText() != mWindow->getProfileDescription())
-    {
-        // This prevents a new undo command being spawned as a result of refreshing
-        mRefreshInProgress = true;
-        mUI.description->setPlainText(mWindow->getProfileDescription());
-        mRefreshInProgress = false;
-    }
-}
-
-void ProfilePropertiesDockWidget::profileTitleChanged(const QString& newTitle)
-{
-    if (mRefreshInProgress)
-        return;
-
-    mWindow->setProfileTitleWithUndoCommand(newTitle);
-}
-
-void ProfilePropertiesDockWidget::profileDescriptionChanged()
-{
-    if (mRefreshInProgress)
-        return;
-
-    mWindow->setProfileDescriptionWithUndoCommand(mUI.description->toPlainText());
-}
-
-XCCDFItemPropertiesDockWidget::XCCDFItemPropertiesDockWidget(QWidget* parent):
-    QDockWidget(parent),
-
-    mXccdfItem(0)
-{
-    mUI.setupUi(this);
-}
-
-XCCDFItemPropertiesDockWidget::~XCCDFItemPropertiesDockWidget()
-{}
-
-void XCCDFItemPropertiesDockWidget::setXccdfItem(struct xccdf_item* item)
-{
-    mXccdfItem = item;
-
-    refresh();
-}
-
-void XCCDFItemPropertiesDockWidget::refresh()
-{
-    if (mXccdfItem)
-    {
-        mUI.titleLineEdit->setText(oscapTextIteratorGetPreferred(xccdf_item_get_title(mXccdfItem)));
-        mUI.idLineEdit->setText(QString::fromUtf8(xccdf_item_get_id(mXccdfItem)));
-        mUI.descriptionTextEdit->setHtml(oscapTextIteratorGetPreferred(xccdf_item_get_description(mXccdfItem)));
-    }
-    else
-    {
-        mUI.titleLineEdit->setText("<no item selected>");
-        mUI.idLineEdit->setText("");
-        mUI.descriptionTextEdit->setHtml("");
-    }
-}
-
-inline struct xccdf_item* getXccdfItemFromTreeItem(QTreeWidgetItem* treeItem)
+struct xccdf_item* TailoringWindow::getXccdfItemFromTreeItem(QTreeWidgetItem* treeItem)
 {
     QVariant xccdfItem = treeItem->data(0, Qt::UserRole);
     return reinterpret_cast<struct xccdf_item*>(xccdfItem.value<void*>());
-}
-
-ProfileTitleChangeUndoCommand::ProfileTitleChangeUndoCommand(TailoringWindow* window, const QString& oldTitle, const QString& newTitle):
-    mWindow(window),
-    mOldTitle(oldTitle),
-    mNewTitle(newTitle)
-{}
-
-ProfileTitleChangeUndoCommand::~ProfileTitleChangeUndoCommand()
-{}
-
-int ProfileTitleChangeUndoCommand::id() const
-{
-    return 2;
-}
-
-void ProfileTitleChangeUndoCommand::redo()
-{
-    mWindow->setProfileTitle(mNewTitle);
-    mWindow->refreshProfileDockWidget();
-}
-
-void ProfileTitleChangeUndoCommand::undo()
-{
-    mWindow->setProfileTitle(mOldTitle);
-    mWindow->refreshProfileDockWidget();
-}
-
-bool ProfileTitleChangeUndoCommand::mergeWith(const QUndoCommand *other)
-{
-    if (other->id() != id())
-        return false;
-
-    mNewTitle = static_cast<const ProfileTitleChangeUndoCommand*>(other)->mNewTitle;
-    return true;
-}
-ProfileDescriptionChangeUndoCommand::ProfileDescriptionChangeUndoCommand(TailoringWindow* window, const QString& oldDesc, const QString& newDesc):
-    mWindow(window),
-    mOldDesc(oldDesc),
-    mNewDesc(newDesc)
-{}
-
-ProfileDescriptionChangeUndoCommand::~ProfileDescriptionChangeUndoCommand()
-{}
-
-int ProfileDescriptionChangeUndoCommand::id() const
-{
-    return 3;
-}
-
-void ProfileDescriptionChangeUndoCommand::redo()
-{
-    mWindow->setProfileDescription(mNewDesc);
-    mWindow->refreshProfileDockWidget();
-}
-
-void ProfileDescriptionChangeUndoCommand::undo()
-{
-    mWindow->setProfileDescription(mOldDesc);
-    mWindow->refreshProfileDockWidget();
-}
-
-bool ProfileDescriptionChangeUndoCommand::mergeWith(const QUndoCommand *other)
-{
-    if (other->id() != id())
-        return false;
-
-    mNewDesc = static_cast<const ProfileDescriptionChangeUndoCommand*>(other)->mNewDesc;
-    return true;
-}
-
-XCCDFItemSelectUndoCommand::XCCDFItemSelectUndoCommand(TailoringWindow* window, QTreeWidgetItem* item, bool newSelect):
-    mWindow(window),
-    mTreeItem(item),
-    mNewSelect(newSelect)
-{}
-
-XCCDFItemSelectUndoCommand::~XCCDFItemSelectUndoCommand()
-{}
-
-int XCCDFItemSelectUndoCommand::id() const
-{
-    return 1;
-}
-
-void XCCDFItemSelectUndoCommand::redo()
-{
-    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(mTreeItem);
-    mWindow->setItemSelected(xccdfItem, mNewSelect);
-    mWindow->synchronizeTreeItem(mTreeItem, xccdfItem, false);
-}
-
-void XCCDFItemSelectUndoCommand::undo()
-{
-    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(mTreeItem);
-    mWindow->setItemSelected(xccdfItem, !mNewSelect);
-    mWindow->synchronizeTreeItem(mTreeItem, xccdfItem, false);
 }
 
 /**
@@ -261,21 +80,32 @@ void _refreshXCCDFItemChildrenDisabledState(QTreeWidgetItem* treeItem, bool allA
     }
 }
 
-TailoringWindow::TailoringWindow(struct xccdf_policy* policy, struct xccdf_benchmark* benchmark, MainWindow* parent):
+TailoringWindow::TailoringWindow(struct xccdf_policy* policy, struct xccdf_benchmark* benchmark, bool newProfile, MainWindow* parent):
     QMainWindow(parent),
 
     mParentMainWindow(parent),
+    mQSettings(new QSettings(this)),
 
     mSynchronizeItemLock(0),
 
-    mProfilePropertiesDockWidget(new ProfilePropertiesDockWidget(this, this)),
     mItemPropertiesDockWidget(new XCCDFItemPropertiesDockWidget(this)),
+    mProfilePropertiesDockWidget(new ProfilePropertiesDockWidget(this, this)),
+    mUndoViewDockWidget(new QDockWidget(this)),
+
+    mSearchBox(new QLineEdit()),
+    mSearchButton(new QPushButton("Search")),
 
     mPolicy(policy),
     mProfile(xccdf_policy_get_profile(policy)),
     mBenchmark(benchmark),
 
-    mUndoStack(this)
+    mUndoStack(this),
+
+    mNewProfile(newProfile),
+    mChangesConfirmed(false),
+
+    mSearchSkippedItems(0),
+    mSearchCurrentNeedle("")
 {
     // sanity check
     if (!mPolicy)
@@ -293,31 +123,51 @@ TailoringWindow::TailoringWindow(struct xccdf_policy* policy, struct xccdf_bench
     mUI.setupUi(this);
 
     QObject::connect(
-        mUI.finishButton, SIGNAL(released()),
+        mUI.confirmButton, SIGNAL(released()),
+        this, SLOT(confirmAndClose())
+    );
+
+    QObject::connect(
+        mUI.cancelButton, SIGNAL(released()),
         this, SLOT(close())
     );
 
-    addDockWidget(Qt::RightDockWidgetArea, mProfilePropertiesDockWidget);
+    QObject::connect(
+        mUI.deleteProfileButton, SIGNAL(released()),
+        this, SLOT(deleteProfileAndDiscard())
+    );
+
     addDockWidget(Qt::RightDockWidgetArea, mItemPropertiesDockWidget);
+    addDockWidget(Qt::RightDockWidgetArea, mProfilePropertiesDockWidget);
 
     {
-        QAction* undoAction = mUndoStack.createUndoAction(this, "Undo");
-        undoAction->setIcon(QIcon::fromTheme("edit-undo"));
-        QAction* redoAction = mUndoStack.createRedoAction(this, "Redo");
-        redoAction->setIcon(QIcon::fromTheme("edit-redo"));
+        QAction* undoAction = mUndoStack.createUndoAction(this, QObject::tr("Undo"));
+        undoAction->setIcon(getShareIcon("edit-undo.png"));
+        QAction* redoAction = mUndoStack.createRedoAction(this, QObject::tr("Redo"));
+        redoAction->setIcon(getShareIcon("edit-redo.png"));
 
         mUI.toolBar->addAction(undoAction);
         mUI.toolBar->addAction(redoAction);
     }
 
-    QObject::connect(
-        mUI.itemsTree, SIGNAL(currentItemChanged(QTreeWidgetItem*, QTreeWidgetItem*)),
-        this, SLOT(itemSelectionChanged(QTreeWidgetItem*, QTreeWidgetItem*))
-    );
+    // Column 1 is for search keywords
+    mUI.itemsTree->setColumnHidden(1, true);
 
     QObject::connect(
-        mUI.itemsTree, SIGNAL(itemChanged(QTreeWidgetItem*, int)),
-        this, SLOT(itemChanged(QTreeWidgetItem*, int))
+        mUI.itemsTree, SIGNAL(currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)),
+        this, SLOT(itemSelectionChanged(QTreeWidgetItem*,QTreeWidgetItem*))
+    );
+    QObject::connect(
+        mUI.itemsTree, SIGNAL(itemChanged(QTreeWidgetItem*,int)),
+        this, SLOT(itemChanged(QTreeWidgetItem*,int))
+    );
+    QObject::connect(
+        mUI.itemsTree, SIGNAL(itemExpanded(QTreeWidgetItem*)),
+        this, SLOT(itemExpanded(QTreeWidgetItem*))
+    );
+    QObject::connect(
+        mUI.itemsTree, SIGNAL(itemCollapsed(QTreeWidgetItem*)),
+        this, SLOT(itemCollapsed(QTreeWidgetItem*))
     );
 
     QTreeWidgetItem* benchmarkItem = new QTreeWidgetItem();
@@ -331,25 +181,78 @@ TailoringWindow::TailoringWindow(struct xccdf_policy* policy, struct xccdf_bench
     synchronizeTreeItem(benchmarkItem, xccdf_benchmark_to_item(mBenchmark), true);
     _refreshXCCDFItemChildrenDisabledState(benchmarkItem, true);
 
-    // we cannot rely on any ordering from openscap, to make sure items appear
-    // in the same order when scap-workbench is run multiple times we have to sort
-    mUI.itemsTree->sortByColumn(0, Qt::AscendingOrder);
+    mUI.itemsTree->header()->setResizeMode(0, QHeaderView::ResizeToContents);
+    mUI.itemsTree->header()->setStretchLastSection(false);
 
-    // let title stretch and take space as the tailoring window grows
-    mUI.itemsTree->header()->setResizeMode(0, QHeaderView::Stretch);
+    deserializeCollapsedItems();
+    syncCollapsedItems();
 
-    mUI.itemsTree->expandAll();
+    setWindowTitle(QObject::tr("Tailoring \"%1\"").arg(oscapTextIteratorGetPreferred(xccdf_profile_get_title(mProfile))));
 
-    setWindowTitle(QString("Tailoring '%1'").arg(oscapTextIteratorGetPreferred(xccdf_profile_get_title(mProfile))));
-
-    mProfilePropertiesDockWidget->refresh();
     mItemPropertiesDockWidget->refresh();
+    mProfilePropertiesDockWidget->refresh();
 
+    {
+        mUndoViewDockWidget->setWindowTitle(QObject::tr("Undo History"));
+        mUndoViewDockWidget->setWidget(new QUndoView(&mUndoStack, mUndoViewDockWidget));
+        addDockWidget(Qt::RightDockWidgetArea, mUndoViewDockWidget);
+        mUndoViewDockWidget->hide();
+
+        mUI.toolBar->addAction(mUndoViewDockWidget->toggleViewAction());
+    }
+
+    mUI.toolBar->addSeparator();
+
+    {
+        QAction* action = new QAction(this);
+        action->setText(QObject::tr("Deselect All"));
+
+        QObject::connect(
+            action, SIGNAL(triggered()),
+            this, SLOT(deselectAllChildrenItems())
+        );
+
+        mUI.toolBar->addAction(action);
+    }
+
+    mUI.toolBar->addSeparator();
+
+    QAction* searchBoxFocusAction = new QAction(QObject::tr("Search"), this);
+    searchBoxFocusAction->setShortcut(QKeySequence::Find);
+    addAction(searchBoxFocusAction);
+
+    QObject::connect(
+        searchBoxFocusAction, SIGNAL(triggered()),
+        mSearchBox, SLOT(setFocus())
+    );
+
+    mSearchBox->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    mUI.toolBar->addSeparator();
+    mUI.toolBar->addWidget(mSearchBox);
+
+    mSearchButton->setShortcut(QKeySequence::FindNext);
+
+    mUI.toolBar->addWidget(mSearchButton);
+
+    QObject::connect(
+        mSearchBox, SIGNAL(editingFinished()),
+        this, SLOT(searchNext())
+    );
+
+    QObject::connect(
+        mSearchButton, SIGNAL(released()),
+        this, SLOT(searchNext())
+    );
+
+    // start centered
+    move(QApplication::desktop()->screen()->rect().center() - rect().center());
     show();
 }
 
 TailoringWindow::~TailoringWindow()
-{}
+{
+    delete mQSettings;
+}
 
 inline bool getXccdfItemInternalSelected(struct xccdf_policy* policy, struct xccdf_item* item)
 {
@@ -379,32 +282,45 @@ void TailoringWindow::synchronizeTreeItem(QTreeWidgetItem* treeItem, struct xccd
 {
     ++mSynchronizeItemLock;
 
-    treeItem->setText(0, oscapTextIteratorGetPreferred(xccdf_item_get_title(xccdfItem)));
+    const QString title = oscapTextIteratorGetPreferred(xccdf_item_get_title(xccdfItem));
+    treeItem->setText(0, title);
 
-    const unsigned int typeColumn = 1;
-
+    QString searchable = QString("%1 %2").arg(title, QString::fromUtf8(xccdf_item_get_id(xccdfItem)));
     switch (xccdf_item_get_type(xccdfItem))
     {
         case XCCDF_BENCHMARK:
-            treeItem->setText(typeColumn, QString("Benchmark"));
-            // benchmark is the root of the tree, it makes no sense to have it collapsed
-            mUI.itemsTree->expandItem(treeItem);
+            treeItem->setIcon(0, getShareIcon("benchmark.png"));
             break;
 
         case XCCDF_GROUP:
-            treeItem->setText(typeColumn, QString("Group"));
+            treeItem->setIcon(0, getShareIcon("group.png"));
             break;
 
         case XCCDF_RULE:
-            treeItem->setText(typeColumn, QString("Rule"));
+            treeItem->setIcon(0, getShareIcon("rule.png"));
+            {
+                struct xccdf_ident_iterator* idents = xccdf_rule_get_idents(xccdf_item_to_rule(xccdfItem));
+                while (xccdf_ident_iterator_has_more(idents))
+                {
+                    struct xccdf_ident* ident = xccdf_ident_iterator_next(idents);
+                    searchable += ' ';
+                    searchable += QString::fromUtf8(xccdf_ident_get_id(ident));
+                }
+                xccdf_ident_iterator_free(idents);
+            }
+            break;
+
+        case XCCDF_VALUE:
+            treeItem->setIcon(0, getShareIcon("value.png"));
             break;
 
         default:
-            treeItem->setText(typeColumn, QString("Unknown"));
+            treeItem->setIcon(0, QIcon());
             break;
     }
 
-    treeItem->setText(2, QString::fromUtf8(xccdf_item_get_id(xccdfItem)));
+    treeItem->setText(1, searchable);
+
     treeItem->setData(0, Qt::UserRole, QVariant::fromValue(reinterpret_cast<void*>(xccdfItem)));
 
     xccdf_type_t xccdfItemType = xccdf_item_get_type(xccdfItem);
@@ -413,30 +329,53 @@ void TailoringWindow::synchronizeTreeItem(QTreeWidgetItem* treeItem, struct xccd
         case XCCDF_RULE:
         case XCCDF_GROUP:
         {
+            treeItem->setFlags(treeItem->flags() | Qt::ItemIsUserCheckable);
             treeItem->setCheckState(0,
                     getXccdfItemInternalSelected(mPolicy, xccdfItem) ? Qt::Checked : Qt::Unchecked);
             _syncXCCDFItemChildrenDisabledState(treeItem, treeItem->checkState(0));
             break;
         }
+        case XCCDF_VALUE:
+            treeItem->setFlags(treeItem->flags() & ~Qt::ItemIsUserCheckable);
         default:
             break;
     }
 
     if (recursive)
     {
-        std::set<struct xccdf_item*> itemsToAdd;
+        typedef std::vector<struct xccdf_item*> XCCDFItemVector;
+        typedef std::map<struct xccdf_item*, QTreeWidgetItem*> XCCDFToQtItemMap;
+
+        XCCDFItemVector itemsToAdd;
+        XCCDFToQtItemMap existingItemsMap;
+
+        // valuesIt contains Values
+        struct xccdf_value_iterator* valuesIt = NULL;
+        // itemsIt contains Rules and Groups
         struct xccdf_item_iterator* itemsIt = NULL;
 
         switch (xccdfItemType)
         {
             case XCCDF_GROUP:
+                valuesIt = xccdf_group_get_values(xccdf_item_to_group(xccdfItem));
                 itemsIt = xccdf_group_get_content(xccdf_item_to_group(xccdfItem));
                 break;
             case XCCDF_BENCHMARK:
+                valuesIt = xccdf_benchmark_get_values(xccdf_item_to_benchmark(xccdfItem));
                 itemsIt = xccdf_benchmark_get_content(xccdf_item_to_benchmark(xccdfItem));
                 break;
             default:
                 break;
+        }
+
+        if (valuesIt != NULL)
+        {
+            while (xccdf_value_iterator_has_more(valuesIt))
+            {
+                struct xccdf_value* childItem = xccdf_value_iterator_next(valuesIt);
+                itemsToAdd.push_back(xccdf_value_to_item(childItem));
+            }
+            xccdf_value_iterator_free(valuesIt);
         }
 
         if (itemsIt != NULL)
@@ -444,53 +383,111 @@ void TailoringWindow::synchronizeTreeItem(QTreeWidgetItem* treeItem, struct xccd
             while (xccdf_item_iterator_has_more(itemsIt))
             {
                 struct xccdf_item* childItem = xccdf_item_iterator_next(itemsIt);
-                itemsToAdd.insert(childItem);
+                itemsToAdd.push_back(childItem);
             }
             xccdf_item_iterator_free(itemsIt);
         }
 
-        std::set<QTreeWidgetItem*> treeItemsToRemove;
         for (int i = 0; i < treeItem->childCount(); ++i)
         {
             QTreeWidgetItem* childTreeItem = treeItem->child(i);
             struct xccdf_item* childXccdfItem = getXccdfItemFromTreeItem(childTreeItem);
 
-            if (itemsToAdd.find(childXccdfItem) == itemsToAdd.end())
+            if (std::find(itemsToAdd.begin(), itemsToAdd.end(), childXccdfItem) == itemsToAdd.end())
             {
-                treeItemsToRemove.insert(childTreeItem);
+                // this will remove it from the tree as well, see ~QTreeWidgetItem()
+                delete childTreeItem;
             }
             else
             {
-                synchronizeTreeItem(childTreeItem, childXccdfItem, true);
-                itemsToAdd.erase(childXccdfItem);
+                existingItemsMap[childXccdfItem] = childTreeItem;
             }
         }
 
-        for (std::set<QTreeWidgetItem*>::const_iterator it = treeItemsToRemove.begin();
-                it != treeItemsToRemove.end(); ++it)
+        unsigned int idx = 0;
+        for (XCCDFItemVector::const_iterator it = itemsToAdd.begin();
+                it != itemsToAdd.end(); ++it, ++idx)
         {
-            // this will remove it from the tree as well, see ~QTreeWidgetItem()
-            delete *it;
-        }
-
-        for (std::set<struct xccdf_item*>::const_iterator it = itemsToAdd.begin();
-                it != itemsToAdd.end(); ++it)
-        {
-            QTreeWidgetItem* childTreeItem = new QTreeWidgetItem();
-            childTreeItem->setFlags(
-                    Qt::ItemIsSelectable |
-                    Qt::ItemIsUserCheckable |
-                    Qt::ItemIsEnabled);
-            childTreeItem->setCheckState(0, Qt::Checked);
-
-            treeItem->addChild(childTreeItem);
             struct xccdf_item* childXccdfItem = *it;
+            QTreeWidgetItem* childTreeItem = 0;
+
+            XCCDFToQtItemMap::iterator mapIt = existingItemsMap.find(childXccdfItem);
+
+            if (mapIt == existingItemsMap.end())
+            {
+                childTreeItem = new QTreeWidgetItem();
+
+                childTreeItem->setFlags(
+                        Qt::ItemIsSelectable |
+                        Qt::ItemIsEnabled);
+
+                treeItem->insertChild(idx, childTreeItem);
+            }
+            else
+            {
+                childTreeItem = mapIt->second;
+            }
 
             synchronizeTreeItem(childTreeItem, childXccdfItem, true);
         }
     }
 
     --mSynchronizeItemLock;
+}
+
+void TailoringWindow::setValueValue(struct xccdf_value* xccdfValue, const QString& newValue)
+{
+    struct xccdf_setvalue* setvalue = xccdf_setvalue_new();
+    xccdf_setvalue_set_item(setvalue, xccdf_value_get_id(xccdfValue));
+    xccdf_setvalue_set_value(setvalue, newValue.toUtf8().constData());
+
+    xccdf_profile_add_setvalue(mProfile, setvalue);
+
+    assert(getCurrentValueValue(xccdfValue) == newValue);
+}
+
+void TailoringWindow::refreshXccdfItemPropertiesDockWidget()
+{
+    mItemPropertiesDockWidget->refresh();
+}
+
+QString TailoringWindow::getCurrentValueValue(struct xccdf_value* xccdfValue)
+{
+    return QString::fromUtf8(xccdf_policy_get_value_of_item(mPolicy, xccdf_value_to_item(xccdfValue)));
+}
+
+void TailoringWindow::setValueValueWithUndoCommand(struct xccdf_value* xccdfValue, const QString& newValue)
+{
+    mUndoStack.push(new XCCDFValueChangeUndoCommand(this, xccdfValue, newValue, getCurrentValueValue(xccdfValue)));
+}
+
+void TailoringWindow::deselectAllChildrenItems(QTreeWidgetItem* parent, bool undoMacro)
+{
+    if (parent == 0)
+        parent = mUI.itemsTree->topLevelItem(0);
+
+    if (undoMacro)
+        mUndoStack.beginMacro("Deselect All");
+
+    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(parent);
+    switch (xccdf_item_get_type(xccdfItem))
+    {
+        case XCCDF_BENCHMARK:
+        case XCCDF_GROUP:
+            for (int i = 0; i < parent->childCount(); ++i)
+                deselectAllChildrenItems(parent->child(i), false);
+            break;
+
+        case XCCDF_RULE:
+            parent->setCheckState(0, Qt::Unchecked);
+            break;
+
+        default:
+            break;
+    }
+
+    if (undoMacro)
+        mUndoStack.endMacro();
 }
 
 QString TailoringWindow::getProfileID() const
@@ -570,13 +567,55 @@ void TailoringWindow::setProfileDescriptionWithUndoCommand(const QString& newDes
     mUndoStack.push(new ProfileDescriptionChangeUndoCommand(this, getProfileDescription(), newDescription));
 }
 
+QString TailoringWindow::getXCCDFItemTitle(struct xccdf_item* item) const
+{
+    return oscapItemGetReadableTitle(item, mPolicy);
+}
+
+QString TailoringWindow::getXCCDFItemDescription(struct xccdf_item* item) const
+{
+    return oscapItemGetReadableDescription(item, mPolicy);
+}
+
 void TailoringWindow::refreshProfileDockWidget()
 {
     mProfilePropertiesDockWidget->refresh();
 }
 
+void TailoringWindow::confirmAndClose()
+{
+    mChangesConfirmed = true;
+
+    close();
+}
+
+void TailoringWindow::deleteProfileAndDiscard()
+{
+    mChangesConfirmed = false;
+    mNewProfile = true;
+
+    close();
+}
+
 void TailoringWindow::closeEvent(QCloseEvent * event)
 {
+    if (!mChangesConfirmed)
+    {
+        if (QMessageBox::question(this, QObject::tr("Discard changes?"),
+            QObject::tr("Are you sure you want to discard all changes performed in this tailoring window."),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::No)
+        {
+            event->ignore();
+            return;
+        }
+
+        // undo everything
+        mUndoStack.setIndex(0);
+        // TODO: Delete the profile if it was created as a tailoring action
+    }
+
+    serializeCollapsedItems();
+
     QMainWindow::closeEvent(event);
 
     // TODO: This is the only place where we depend on MainWindow which really sucks
@@ -586,15 +625,96 @@ void TailoringWindow::closeEvent(QCloseEvent * event)
 
     if (mParentMainWindow)
     {
-        mParentMainWindow->refreshSelectedRulesTree();
-        mParentMainWindow->refreshProfiles();
+        mParentMainWindow->notifyTailoringFinished(mNewProfile, mChangesConfirmed);
+    }
+}
+
+QString TailoringWindow::getQSettingsKey() const
+{
+    const QString filePath = mParentMainWindow->getOpenedFilePath();
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+    hash.addData(filePath.toUtf8());
+    return QString("collapsed_items_%1").arg(QString(hash.result().toHex()));
+}
+
+void TailoringWindow::deserializeCollapsedItems()
+{
+    const QStringList list = mQSettings->value(getQSettingsKey()).toStringList();
+    mCollapsedItemIds = QSet<QString>::fromList(list);
+}
+
+void TailoringWindow::serializeCollapsedItems()
+{
+    if (mCollapsedItemIds.isEmpty())
+        mQSettings->remove(getQSettingsKey());
+    else
+        mQSettings->setValue(getQSettingsKey(), QVariant(mCollapsedItemIds.toList()));
+}
+
+void TailoringWindow::syncCollapsedItems()
+{
+    QSet<QString> usedCollapsedItems;
+    syncCollapsedItem(mUI.itemsTree->topLevelItem(0), usedCollapsedItems);
+    // This "cleans" the ids of non-existent ones.
+    // That's useful when the content changes and avoids cruft buildup in the settings files.
+    mCollapsedItemIds = usedCollapsedItems;
+}
+
+void TailoringWindow::syncCollapsedItem(QTreeWidgetItem* item, QSet<QString>& usedCollapsedIds)
+{
+    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(item);
+    const QString id = QString::fromUtf8(xccdf_item_get_id(xccdfItem));
+
+    if (mCollapsedItemIds.contains(id))
+    {
+        mUI.itemsTree->collapseItem(item);
+        usedCollapsedIds.insert(id);
+    }
+    else
+    {
+        mUI.itemsTree->expandItem(item);
+    }
+
+    for (int i = 0; i < item->childCount(); ++i)
+        syncCollapsedItem(item->child(i), usedCollapsedIds);
+}
+
+void TailoringWindow::searchNext()
+{
+    const QString& needle = mSearchBox->text();
+
+    if (needle == mSearchCurrentNeedle)
+        ++mSearchSkippedItems;
+    else
+        mSearchSkippedItems = 0;
+
+    mSearchCurrentNeedle = needle;
+
+    // FIXME: We could cache this when skipping to save CPU cycles but it's not worth
+    //        as searching takes miliseconds even for huge XCCDF files.
+    // Column 1 is used for search keywords
+    QList<QTreeWidgetItem*> matches = mUI.itemsTree->findItems(mSearchCurrentNeedle, Qt::MatchContains | Qt::MatchRecursive, 1);
+    if (matches.size() > 0)
+    {
+        mSearchSkippedItems = mSearchSkippedItems % matches.size(); // wrap around
+
+        QTreeWidgetItem* match = matches.at(mSearchSkippedItems);
+        mUI.itemsTree->setCurrentItem(match);
+
+        mSearchBox->setStyleSheet("");
+    }
+    else
+    {
+        mSearchSkippedItems = 0;
+        // In case of no match we intentionally do not change selection
+        mSearchBox->setStyleSheet("background: #f66");
     }
 }
 
 void TailoringWindow::itemSelectionChanged(QTreeWidgetItem* current, QTreeWidgetItem* previous)
 {
     struct xccdf_item* item = getXccdfItemFromTreeItem(current);
-    mItemPropertiesDockWidget->setXccdfItem(item);
+    mItemPropertiesDockWidget->setXccdfItem(item, mPolicy);
 }
 
 void TailoringWindow::itemChanged(QTreeWidgetItem* treeItem, int column)
@@ -608,10 +728,27 @@ void TailoringWindow::itemChanged(QTreeWidgetItem* treeItem, int column)
     if (!xccdfItem)
         return;
 
+    if (xccdf_item_get_type(xccdfItem) == XCCDF_VALUE)
+        return;
+
     const bool itemCheckState = getXccdfItemInternalSelected(mPolicy, xccdfItem);
 
     if (checkState != itemCheckState)
         mUndoStack.push(new XCCDFItemSelectUndoCommand(this, treeItem, checkState));
 
     _syncXCCDFItemChildrenDisabledState(treeItem, checkState);
+}
+
+void TailoringWindow::itemExpanded(QTreeWidgetItem* item)
+{
+    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(item);
+    const QString id = QString::fromUtf8(xccdf_item_get_id(xccdfItem));
+    mCollapsedItemIds.remove(id);
+}
+
+void TailoringWindow::itemCollapsed(QTreeWidgetItem* item)
+{
+    struct xccdf_item* xccdfItem = getXccdfItemFromTreeItem(item);
+    const QString id = QString::fromUtf8(xccdf_item_get_id(xccdfItem));
+    mCollapsedItemIds.insert(id);
 }

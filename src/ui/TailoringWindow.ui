@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
-    <height>727</height>
+    <width>960</width>
+    <height>830</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,6 +20,33 @@
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
      <widget class="QTreeWidget" name="itemsTree">
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAsNeeded</enum>
+      </property>
+      <property name="alternatingRowColors">
+       <bool>false</bool>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>22</width>
+        <height>22</height>
+       </size>
+      </property>
+      <property name="textElideMode">
+       <enum>Qt::ElideNone</enum>
+      </property>
+      <property name="uniformRowHeights">
+       <bool>true</bool>
+      </property>
+      <property name="wordWrap">
+       <bool>false</bool>
+      </property>
+      <property name="columnCount">
+       <number>2</number>
+      </property>
+      <attribute name="headerVisible">
+       <bool>false</bool>
+      </attribute>
       <attribute name="headerDefaultSectionSize">
        <number>150</number>
       </attribute>
@@ -33,12 +60,7 @@
       </column>
       <column>
        <property name="text">
-        <string>Type</string>
-       </property>
-      </column>
-      <column>
-       <property name="text">
-        <string>ID</string>
+        <string/>
        </property>
       </column>
      </widget>
@@ -46,19 +68,6 @@
     <item>
      <widget class="QWidget" name="widget" native="true">
       <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QLabel" name="label">
-         <property name="text">
-          <string>Changes will be saved but Undo / Redo history will be lost if you press 'Finish tailoring'!</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-         <property name="wordWrap">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
        <item>
         <spacer name="horizontalSpacer">
          <property name="orientation">
@@ -73,16 +82,40 @@
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="finishButton">
+        <widget class="QPushButton" name="confirmButton">
          <property name="font">
           <font>
-           <pointsize>12</pointsize>
+           <pointsize>10</pointsize>
            <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
          <property name="text">
-          <string>Finish tailoring</string>
+          <string>Confirm tailoring</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="cancelButton">
+         <property name="toolTip">
+          <string>Closes this window and discard all changes</string>
+         </property>
+         <property name="text">
+          <string>Discard changes</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="line">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="deleteProfileButton">
+         <property name="text">
+          <string>Delete profile</string>
          </property>
         </widget>
        </item>
@@ -96,14 +129,20 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1000</width>
+     <width>960</width>
      <height>21</height>
     </rect>
    </property>
   </widget>
   <widget class="QToolBar" name="toolBar">
    <property name="windowTitle">
-    <string>toolBar</string>
+    <string>Toolbar</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>32</width>
+     <height>32</height>
+    </size>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>

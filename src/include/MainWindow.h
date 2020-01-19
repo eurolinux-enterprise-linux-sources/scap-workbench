@@ -45,7 +45,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
     public:
-        MainWindow(QWidget* parent = 0);
+        explicit MainWindow(QWidget* parent = 0);
         virtual ~MainWindow();
 
     public slots:
@@ -79,6 +79,13 @@ class MainWindow : public QMainWindow
          * @brief Checks whether a file is currently opened
          */
         bool fileOpened() const;
+
+        /**
+         * @brief Retrieves full (absolute) path of opened file
+         *
+         * @note Returns empty string if no file is opened
+         */
+        QString getOpenedFilePath() const;
 
         /**
          * @brief Automatically determines scanner mode based on checkbox state
@@ -140,6 +147,9 @@ class MainWindow : public QMainWindow
         void reloadSession();
 
     public: // TailoringWindow calls this
+        void notifyTailoringFinished(bool newProfile, bool changesConfirmed);
+
+    private:
         /**
          * @brief Refreshes items of the profile combobox with data from the session
          *
@@ -147,7 +157,13 @@ class MainWindow : public QMainWindow
          */
         void refreshProfiles();
 
-    private:
+        /**
+         * @brief Refreshes the checklists combobox from scratch
+         *
+         * @note Does not keep the previous selection!
+         * @note Throws exceptions!
+         */
+        void refreshChecklists();
 
         /**
          * @brief Destroys the scanning thread and associated data
@@ -159,21 +175,15 @@ class MainWindow : public QMainWindow
         /// UI designed in Qt Designer
         Ui_MainWindow mUI;
 
-        /// Qt Dialog that displays messages (errors, warnings, infos)
+        /// Qt Dialog that displays messages (errors, warnings, info)
         /// Gets shown whenever a warning or error is emitted
         DiagnosticsDialog* mDiagnosticsDialog;
 
-        /// Menu used for the tailor "combo pushbutton"
-        QMenu* mSaveMenu;
-
-        QAction* mSaveIntoDirAction;
-        QAction* mSaveAsRPMAction;
+        /// Needed for SCAP RPM opening functionality
+        RPMOpenHelper* mRPMOpenHelper;
 
         /// This is our central point of interaction with openscap
         ScanningSession* mScanningSession;
-
-        /// Qt Dialog that displays results and allows user to save them
-        ResultViewer* mResultViewer;
 
         /// Thread that handles scanning and/or remediating, NULL if none is underway
         QThread* mScanThread;
@@ -201,7 +211,7 @@ class MainWindow : public QMainWindow
          *
          * Qt handles thread messaging for us via the slot & signal mechanism.
          * The event loop of MainWindow runs in one thread, the event loop of
-         * the scanner runs in another thread. Both are basically synchronisation
+         * the scanner runs in another thread. Both are basically synchronization
          * queues. This is why we emit this signal instead of calling scanner's
          * methods directly.
          *
@@ -219,11 +229,27 @@ class MainWindow : public QMainWindow
         void profileComboboxChanged(int index);
 
     public slots:
-        /// Refreshes the selected rules tree according to current profile
+        /**
+         * @brief Refreshes the selected rules tree according to current profile
+         *
+         * Selected rules tree is just an estimate and may not match the rules
+         * that will be later evaluated by oscap. Only oscap is authoritative
+         * in which rules are evaluated!
+         */
         void refreshSelectedRulesTree();
 
-    private slots:
+    private:
+        /**
+         * @brief Retrieves number of currently selected rules
+         *
+         * Do not rely on this number, it is a fairly reliable estimate
+         * but it is still an estimate!
+         *
+         * @see refreshSelectedRulesTree
+         */
+        unsigned int getSelectedRulesCount();
 
+    private slots:
         /**
          * @brief This slot gets triggered by the scanner to notify of a new result
          *
@@ -276,18 +302,14 @@ class MainWindow : public QMainWindow
         void scanFinished();
 
         /**
-         * @brief When triggered, the ResultViewer is shown as a modal dialog
+         * @brief Triggered when scanning ends
          *
-         * Sole application control is passed to ResultViewer until user closes
-         * it. It is not destroyed upon closing, just hidden.
+         * @param canceled if true the scanning was canceled, otherwise it finished
          */
-        void showResults();
+        void scanEnded(bool canceled);
 
         void inheritAndEditProfile(bool shadowed);
-
-        void tailorNewID();
-        void tailorShadowed();
-        void editProfile();
+        TailoringWindow* editProfile(bool newProfile);
 
         /**
          * @brief If current profile has been tailored, it gets edited, else it gets tailored with new ID
@@ -307,6 +329,29 @@ class MainWindow : public QMainWindow
         void markNoUnsavedTailoringChanges();
         void markLoadedTailoringFile(const QString& filePath);
         bool unsavedTailoringChanges() const;
+
+        /**
+         * @brief Users QDesktopServices to start browser and show user manual in it
+         *
+         * This may not do anything in case user has invalid desktop environment
+         * configuration.
+         */
+        void showUserManual();
+
+        /**
+         * @brief Displays a dialog with information about SCAP Workbench
+         *
+         * This is the customary Help->About dialog. Shows version info,
+         * short description of the application, etc...
+         */
+        void about();
+
+        /**
+         * @brief Displays a dialog with information about Qt version used
+         *
+         * Just a delegate that calls QMessageBox::aboutQt(..)
+         */
+        void aboutQt();
 };
 
 #endif

@@ -20,13 +20,53 @@
  */
 
 #include "APIHelpers.h"
+#include <QObject>
+
+extern "C"
+{
+#include <oscap_error.h>
+#include <xccdf_policy.h>
+}
 
 QString oscapTextIteratorGetPreferred(struct oscap_text_iterator* it, const QString& lang)
 {
     char* preferred_s = oscap_textlist_get_preferred_plaintext(it, lang.isEmpty() ? NULL : lang.toUtf8().constData());
     oscap_text_iterator_free(it);
-    const QString ret(QString::fromUtf8(preferred_s));
+    const QString ret(preferred_s != NULL ? QString::fromUtf8(preferred_s) : QObject::tr("(none)"));
     free(preferred_s);
 
     return ret;
+}
+
+QString oscapItemGetReadableTitle(struct xccdf_item* item, struct xccdf_policy* policy, const QString& lang)
+{
+    struct oscap_text_iterator* title_it = xccdf_item_get_title(item);
+    char* unresolved = oscap_textlist_get_preferred_plaintext(title_it, lang.isEmpty() ? NULL : lang.toUtf8().constData());
+    oscap_text_iterator_free(title_it);
+    if (!unresolved)
+        return "";
+    char* resolved = xccdf_policy_substitute(unresolved, policy);
+    free(unresolved);
+    const QString ret = QString::fromUtf8(resolved);
+    free(resolved);
+    return ret;
+}
+
+QString oscapItemGetReadableDescription(struct xccdf_item *item, struct xccdf_policy *policy, const QString& lang)
+{
+    struct oscap_text_iterator* desc_it = xccdf_item_get_description(item);
+    char* unresolved = oscap_textlist_get_preferred_plaintext(desc_it, lang.isEmpty() ? NULL : lang.toUtf8().constData());
+    oscap_text_iterator_free(desc_it);
+    if (!unresolved)
+        return "";
+    char* resolved = xccdf_policy_substitute(unresolved, policy);
+    free(unresolved);
+    const QString ret = QString::fromUtf8(resolved);
+    free(resolved);
+    return ret;
+}
+
+QString oscapErrDesc()
+{
+    return QString::fromUtf8(oscap_err_desc());
 }
