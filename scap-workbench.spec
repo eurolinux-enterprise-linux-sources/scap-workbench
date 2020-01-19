@@ -1,45 +1,41 @@
-%{?scl:%scl_package scap-workbench}
-%{!?scl:%global pkg_name scap-workbench}
-
-%{?scl:%global _scl_prefix /opt/scap-testing}
-
 %{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}-%{version}}
 
-Name:		%{?scl_prefix}scap-workbench
-Version:	1.0.2
-Release:	2%{?dist}
-Summary:	Scanning, tailoring, editing and validation tool for SCAP content
+Name:       scap-workbench
+Version:    1.1.2
+Release:    1%{?dist}
+Summary:    Scanning, tailoring, editing and validation tool for SCAP content
 
-License:	GPLv3+
-URL:		https://fedorahosted.org/scap-workbench/
-Source0:	https://fedorahosted.org/released/scap-workbench/%{pkg_name}-%{version}.tar.bz2
-# upstreamed, can be removed with rebase to 1.0.3
-Patch0: 	scap-workbench-1.0.2-rpm-open.patch
-Group:		System Environment/Base
+License:    GPLv3+
+URL:        http://www.open-scap.org/tools/scap-workbench
+Source0:    https://github.com/OpenSCAP/scap-workbench/releases/download/%{version}/scap-workbench-%{version}.tar.bz2
+Group:      System Environment/Base
 
-BuildRequires:	cmake
-BuildRequires:	qt-devel
-#BuildRequires:	qtwebkit-devel
+BuildRequires:  cmake >= 2.6
+BuildRequires:  qt-devel >= 4.0.0
 
-BuildRequires:	%{?scl_prefix}openscap-devel >= 1.0.9
-BuildRequires:	%{?scl_prefix}openscap-utils >= 1.0.9
-Requires:		%{?scl_prefix}openscap-utils >= 1.0.9
+BuildRequires:  openscap-devel >= 1.2.0
+BuildRequires:  openscap-utils >= 1.2.0
+Requires:       openscap-utils >= 1.2.0
 # ssh to scan remote machines
-Requires:		openssh-clients
-Requires:		openssh-askpass
+BuildRequires:  openssh-clients
+Requires:       openssh-clients
+Requires:       openssh-askpass
 # because of 'setsid' which we use to force ssh to use GUI askpass
-Requires:		util-linux
+BuildRequires:  util-linux
+Requires:       util-linux
 # for privileged local scanning
-Requires:		polkit
-%{?scl:Requires: %scl_runtime}
+Requires:       polkit
+# default content
+Requires:       scap-security-guide
+# fonts, see https://bugzilla.redhat.com/show_bug.cgi?id=1134418
+Requires:       font(:lang=en)
 
 %description
 scap-workbench is GUI tool that provides scanning functionality for SCAP
 content. The tool is based on OpenSCAP library.
 
 %prep
-%setup -q -n %{pkg_name}-%{version}
-%patch0 -p1
+%setup -q
 
 %build
 %cmake -D CMAKE_INSTALL_DOCDIR=%{_pkgdocdir} .
@@ -64,6 +60,16 @@ make install DESTDIR=%{buildroot}
 %doc %{_pkgdocdir}/user_manual.html
 
 %changelog
+* Mon Jun 20 2016 Martin Preisler <mpreisle@redhat.com> 1.1.2-1
+- Updated to new upstream release 1.1.2
+
+* Thu Mar 17 2016 Martin Preisler <mpreisle@redhat.com> 1.1.1-1
+- Require English fonts (bz#1134418)
+- Updated with latest upstream URLs
+- Reorganized the spec a little
+- Removed SCL related parts from the spec
+- Updated to new upstream release 1.1.1
+
 * Tue Oct 21 2014 Martin Preisler <mpreisle@redhat.com> 1.0.2-2
 - Fix RPM open functionality, see rhbz#1154039
 

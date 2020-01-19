@@ -27,7 +27,7 @@
        <item row="6" column="2">
         <widget class="QPushButton" name="customizeProfileButton">
          <property name="toolTip">
-          <string>Creates a new profile that inherits selected profile, opens a window to edit the newly created profile.</string>
+          <string>Duplicates the current profile, and opens a window to customize it.</string>
          </property>
          <property name="text">
           <string>Customize</string>
@@ -51,8 +51,11 @@
              </property>
              <item>
               <widget class="QRadioButton" name="localMachineRadioButton">
+               <property name="toolTip">
+                <string>Selecting the Local Machine target will cause workbench to evaluate the same machine that it is running on.</string>
+               </property>
                <property name="text">
-                <string>local machine</string>
+                <string>Local Machine</string>
                </property>
                <property name="checked">
                 <bool>true</bool>
@@ -61,8 +64,11 @@
              </item>
              <item>
               <widget class="QRadioButton" name="remoteMachineRadioButton">
+               <property name="toolTip">
+                <string>The Remote Machine target enables workbench to scan any remote machine that can be accessed using SSH.</string>
+               </property>
                <property name="text">
-                <string>remote machine (over ssh)</string>
+                <string>Remote Machine (over SSH)</string>
                </property>
               </widget>
              </item>
@@ -73,16 +79,6 @@
            <widget class="RemoteMachineComboBox" name="remoteMachineDetails" native="true"/>
           </item>
          </layout>
-        </widget>
-       </item>
-       <item row="5" column="2">
-        <widget class="QPushButton" name="saveTailoringButton">
-         <property name="text">
-          <string>Save Tailoring</string>
-         </property>
-         <property name="shortcut">
-          <string/>
-         </property>
         </widget>
        </item>
        <item row="7" column="0" colspan="3">
@@ -118,29 +114,30 @@
        </item>
        <item row="8" column="0">
         <widget class="QLabel" name="label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
          <property name="text">
           <string>Target</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
          </property>
         </widget>
        </item>
        <item row="5" column="0">
         <widget class="QLabel" name="label_4">
          <property name="text">
-          <string>Tailoring</string>
+          <string>Customization</string>
          </property>
         </widget>
        </item>
        <item row="6" column="1">
-        <widget class="QComboBox" name="profileComboBox"/>
-       </item>
-       <item row="5" column="1">
-        <widget class="QComboBox" name="tailoringFileComboBox"/>
+        <widget class="QComboBox" name="profileComboBox">
+         <property name="toolTip">
+          <string>Determines which XCCDF profile will be used for evaluation. Listed profiles come from the input content and customization file.</string>
+         </property>
+         <property name="maxVisibleItems">
+          <number>15</number>
+         </property>
+        </widget>
        </item>
        <item row="3" column="1" colspan="2">
         <widget class="QLabel" name="titleLabel">
@@ -157,8 +154,11 @@
            <bold>true</bold>
           </font>
          </property>
+         <property name="toolTip">
+          <string>TItle of the XCCDF Benchmark</string>
+         </property>
          <property name="text">
-          <string>[Benchmark Title]</string>
+          <string/>
          </property>
         </widget>
        </item>
@@ -182,81 +182,24 @@
          </property>
         </spacer>
        </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QComboBox" name="tailoringFileComboBox">
+         <property name="toolTip">
+          <string>Allows to select, load or reset a customization. Customization is called XCCDF Tailoring in the specification.</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
     <item>
-     <widget class="QWidget" name="widget_2" native="true">
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <item>
-        <widget class="QTreeWidget" name="selectedRulesTree">
-         <property name="font">
-          <font>
-           <pointsize>12</pointsize>
-          </font>
-         </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-         <property name="rootIsDecorated">
-          <bool>false</bool>
-         </property>
-         <attribute name="headerDefaultSectionSize">
-          <number>150</number>
-         </attribute>
-         <attribute name="headerStretchLastSection">
-          <bool>false</bool>
-         </attribute>
-         <column>
-          <property name="text">
-           <string>Rule</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Result</string>
-          </property>
-         </column>
-        </widget>
-       </item>
-       <item>
-        <widget class="QTreeWidget" name="ruleResultsTree">
-         <property name="font">
-          <font>
-           <pointsize>12</pointsize>
-          </font>
-         </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-         <property name="rootIsDecorated">
-          <bool>false</bool>
-         </property>
-         <property name="uniformRowHeights">
-          <bool>true</bool>
-         </property>
-         <property name="sortingEnabled">
-          <bool>false</bool>
-         </property>
-         <attribute name="headerDefaultSectionSize">
-          <number>150</number>
-         </attribute>
-         <attribute name="headerStretchLastSection">
-          <bool>false</bool>
-         </attribute>
-         <column>
-          <property name="text">
-           <string>Rule</string>
-          </property>
-         </column>
-         <column>
-          <property name="text">
-           <string>Result</string>
-          </property>
-         </column>
-        </widget>
-       </item>
-      </layout>
+     <widget class="RuleResultsTree" name="ruleResultsTree" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
      </widget>
     </item>
     <item>
@@ -282,19 +225,6 @@
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>211</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
         <widget class="QWidget" name="widget_5" native="true">
          <layout class="QVBoxLayout" name="verticalLayout_3">
           <property name="margin">
@@ -307,6 +237,51 @@
               <number>0</number>
              </property>
              <item>
+              <widget class="QPushButton" name="showGuideButton">
+               <property name="text">
+                <string>Show Guide</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>211</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="dryRunCheckBox">
+               <property name="toolTip">
+                <string>When checked no action is performed after pressing Scan, a dialog with the used command-line arguments is shown instead.</string>
+               </property>
+               <property name="text">
+                <string>Dry run</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="fetchRemoteResourcesCheckbox">
+               <property name="font">
+                <font>
+                 <pointsize>11</pointsize>
+                </font>
+               </property>
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Allow download of&amp;nbsp;remote OVAL content referenced from&amp;nbsp;XCCDF by&amp;nbsp;check-content-ref/@href.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>Fetch remote resources</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QCheckBox" name="onlineRemediationCheckBox">
                <property name="font">
                 <font>
@@ -314,10 +289,10 @@
                 </font>
                </property>
                <property name="toolTip">
-                <string>Checking this enables online remediation of failed checks. Online in the sense of being done as part of the evaluation.</string>
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Attempts to automatically correct issues identified by the scan.&lt;/p&gt;&lt;p&gt;Note: Automated remediation may impact system functionality.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
                </property>
                <property name="text">
-                <string>Online Remediation</string>
+                <string>Remediate</string>
                </property>
               </widget>
              </item>
@@ -329,6 +304,9 @@
                  <weight>75</weight>
                  <bold>true</bold>
                 </font>
+               </property>
+               <property name="toolTip">
+                <string>Starts the evaluation.</string>
                </property>
                <property name="text">
                 <string>&amp;Scan</string>
@@ -345,6 +323,19 @@
               <number>0</number>
              </property>
              <item>
+              <spacer name="horizontalSpacer_4">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
               <widget class="QPushButton" name="cancelButton">
                <property name="font">
                 <font>
@@ -352,6 +343,9 @@
                  <weight>75</weight>
                  <bold>true</bold>
                 </font>
+               </property>
+               <property name="toolTip">
+                <string>Cancels the evaluation. Partial results may be lost.</string>
                </property>
                <property name="text">
                 <string>Cancel</string>
@@ -371,32 +365,32 @@
               <number>0</number>
              </property>
              <item>
+              <spacer name="horizontalSpacer_3">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
               <widget class="QPushButton" name="clearButton">
                <property name="font">
                 <font>
                  <pointsize>13</pointsize>
                 </font>
                </property>
+               <property name="toolTip">
+                <string>Causes workbench to forget all collected evaluation results and prepares it for another scan.</string>
+               </property>
                <property name="text">
                 <string>&amp;Clear</string>
                </property>
               </widget>
-             </item>
-             <item>
-              <spacer name="horizontalSpacer_3">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeType">
-                <enum>QSizePolicy::Minimum</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>20</width>
-                 <height>1</height>
-                </size>
-               </property>
-              </spacer>
              </item>
              <item>
               <widget class="QPushButton" name="offlineRemediateButton">
@@ -440,7 +434,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>27</height>
+     <height>30</height>
     </rect>
    </property>
    <property name="font">
@@ -457,12 +451,17 @@
     </property>
     <widget class="QMenu" name="menuSave">
      <property name="title">
-      <string>Save As ...</string>
+      <string>Save All</string>
      </property>
      <addaction name="actionSaveIntoDirectory"/>
      <addaction name="actionSaveAsRPM"/>
     </widget>
+    <addaction name="actionOpenSSG"/>
     <addaction name="actionOpen"/>
+    <addaction name="separator"/>
+    <addaction name="actionOpenCustomizationFile"/>
+    <addaction name="separator"/>
+    <addaction name="actionSaveTailoring"/>
     <addaction name="menuSave"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
@@ -478,24 +477,23 @@
     <addaction name="actionAbout"/>
     <addaction name="actionAboutQt"/>
    </widget>
-   <widget class="QMenu" name="menuOptions">
-    <property name="title">
-     <string>Options</string>
-    </property>
-    <addaction name="actionSkipValidation"/>
-   </widget>
    <addaction name="menuFile"/>
-   <addaction name="menuOptions"/>
    <addaction name="menuHelp"/>
   </widget>
   <action name="actionOpen">
    <property name="text">
-    <string>&amp;Open content</string>
+    <string>&amp;Open Other Content</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
    </property>
   </action>
   <action name="actionQuit">
    <property name="text">
     <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
    </property>
   </action>
   <action name="actionAbout">
@@ -510,12 +508,12 @@
   </action>
   <action name="actionSaveIntoDirectory">
    <property name="text">
-    <string>Save into directory</string>
+    <string>Into a directory</string>
    </property>
   </action>
   <action name="actionSaveAsRPM">
    <property name="text">
-    <string>Save as RPM</string>
+    <string>As RPM</string>
    </property>
   </action>
   <action name="actionAboutQt">
@@ -528,15 +526,19 @@
     <string>Show Diagnostics</string>
    </property>
   </action>
-  <action name="actionSkipValidation">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="actionSaveTailoring">
    <property name="text">
-    <string>Skip validation</string>
+    <string>Save Customization Only</string>
    </property>
-   <property name="toolTip">
-    <string>Causes openscap to skip validation of input and output content. This option is discouraged!</string>
+  </action>
+  <action name="actionOpenSSG">
+   <property name="text">
+    <string>Open &amp;SCAP Security Guide</string>
+   </property>
+  </action>
+  <action name="actionOpenCustomizationFile">
+   <property name="text">
+    <string>Open &amp;Customization File</string>
    </property>
   </action>
  </widget>
@@ -553,6 +555,12 @@
    <header>RemoteMachineComboBox.h</header>
    <container>1</container>
   </customwidget>
+  <customwidget>
+   <class>RuleResultsTree</class>
+   <extends>QWidget</extends>
+   <header>RuleResultsTree.h</header>
+   <container>1</container>
+  </customwidget>
  </customwidgets>
  <resources/>
  <connections>
@@ -563,12 +571,12 @@
    <slot>setVisible(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>432</x>
-     <y>234</y>
+     <x>781</x>
+     <y>200</y>
     </hint>
     <hint type="destinationlabel">
-     <x>321</x>
-     <y>270</y>
+     <x>437</x>
+     <y>216</y>
     </hint>
    </hints>
   </connection>

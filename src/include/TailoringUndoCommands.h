@@ -48,6 +48,8 @@ class XCCDFItemSelectUndoCommand : public QUndoCommand
         virtual void undo();
 
     private:
+        void refreshText();
+
         TailoringWindow* mWindow;
 
         QTreeWidgetItem* mTreeItem;
@@ -64,8 +66,6 @@ class XCCDFValueChangeUndoCommand : public QUndoCommand
         XCCDFValueChangeUndoCommand(TailoringWindow* window, struct xccdf_value* xccdfValue, const QString& newValue, const QString& oldValue);
         virtual ~XCCDFValueChangeUndoCommand();
 
-        void refreshText();
-
         virtual int id() const;
 
         virtual bool mergeWith(const QUndoCommand* other);
@@ -74,6 +74,8 @@ class XCCDFValueChangeUndoCommand : public QUndoCommand
         virtual void undo();
 
     private:
+        void refreshText();
+
         TailoringWindow* mWindow;
 
         struct xccdf_value* mXccdfValue;
@@ -100,6 +102,8 @@ class ProfileTitleChangeUndoCommand : public QUndoCommand
         virtual bool mergeWith(const QUndoCommand *other);
 
     private:
+        void refreshText();
+
         TailoringWindow* mWindow;
 
         QString mOldTitle;
@@ -123,10 +127,38 @@ class ProfileDescriptionChangeUndoCommand : public QUndoCommand
         virtual bool mergeWith(const QUndoCommand *other);
 
     private:
+        void refreshText();
+
         TailoringWindow* mWindow;
 
         QString mOldDesc;
         QString mNewDesc;
+};
+
+/**
+ * @brief Can be used to set wait cursor override before undoing/redoing undo macros
+ *
+ * Insert one at the start of the macro with end = false (right after beginMacro(..)) and
+ * one at the end of the macro (just before endMacro()) with end = true.
+ */
+class MacroProgressUndoCommand : public QUndoCommand
+{
+    public:
+        /**
+         * @brief MacroProgressUndoCommand
+         *
+         * @param end If true then this is the trailing closing command
+         */
+        MacroProgressUndoCommand(bool end);
+        virtual ~MacroProgressUndoCommand();
+
+        virtual int id() const;
+
+        virtual void redo();
+        virtual void undo();
+
+    private:
+        bool mEnd;
 };
 
 #endif

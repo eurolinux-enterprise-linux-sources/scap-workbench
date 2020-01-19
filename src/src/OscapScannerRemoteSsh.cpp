@@ -94,11 +94,57 @@ void OscapScannerRemoteSsh::setSession(ScanningSession* session)
 
     if (!mSession->isSDS())
         throw OscapScannerRemoteSshException("You can only use source datastreams for scanning remotely! "
-            "Remote scanning using plain XCCDF and OVAL files has not been implemented in scap-workbench yet.");
+            "Remote scanning using plain XCCDF and OVAL files has not been implemented in SCAP Workbench yet.");
+}
+
+QStringList OscapScannerRemoteSsh::getCommandLineArgs() const
+{
+    QStringList args("oscap-ssh");
+    args.append(mSshConnection.getTarget());
+    args.append(QString::number(mSshConnection.getPort()));
+
+    if (mScannerMode == SM_OFFLINE_REMEDIATION)
+    {
+        QTemporaryFile inputARFFile;
+        inputARFFile.setAutoRemove(true);
+        inputARFFile.open();
+        inputARFFile.write(getARFForRemediation());
+        inputARFFile.close();
+
+        args += buildOfflineRemediationArgs(inputARFFile.fileName(),
+            "/tmp/xccdf-results.xml",
+            "/tmp/report.html",
+            "/tmp/arf.xml",
+            // ignore capabilities because of dry-run
+            true
+        );
+    }
+    else
+    {
+        args += buildEvaluationArgs(mSession->getOpenedFilePath(),
+            mSession->hasTailoring() ? mSession->getTailoringFilePath() : QString(),
+            "/tmp/xccdf-results.xml",
+            "/tmp/report.html",
+            "/tmp/arf.xml",
+            mScannerMode == SM_SCAN_ONLINE_REMEDIATION,
+            // ignore capabilities because of dry-run
+            true
+        );
+    }
+
+    args.removeOne("--progress");
+
+    return args;
 }
 
 void OscapScannerRemoteSsh::evaluate()
 {
+    if (mDryRun)
+    {
+        signalCompletion(mCancelRequested);
+        return;
+    }
+
     ensureConnected();
 
     if (mCancelRequested)
@@ -193,7 +239,7 @@ void OscapScannerRemoteSsh::evaluate()
 
     QProcess process(this);
 
-    process.start("ssh", baseArgs + QStringList(QString("cd '%1'; " SCAP_WORKBENCH_REMOTE_OSCAP_PATH " %2").arg(workingDir).arg(sshCmd)));
+    process.start(SCAP_WORKBENCH_LOCAL_SSH_PATH, baseArgs + QStringList(QString("cd '%1'; " SCAP_WORKBENCH_REMOTE_OSCAP_PATH " %2").arg(workingDir).arg(sshCmd)));
     process.waitForStarted();
 
     if (process.state() != QProcess::Running)
@@ -290,19 +336,18 @@ QString OscapScannerRemoteSsh::copyFileOver(const QString& localPath)
     QString ret = createRemoteTemporaryFile();
 
     {
-        ScpSyncProcess proc(mSshConnection, this);
-        proc.setDirection(SD_LOCAL_TO_REMOTE);
-        proc.setLocalPath(localPath);
-        proc.setRemotePath(ret);
+        SshSyncProcess proc(mSshConnection, this);
+        proc.setStdInFile(localPath);
+        proc.setCommand("tee");
+        proc.setArguments(QStringList(ret));
         proc.setCancelRequestSource(&mCancelRequested);
-
         proc.run();
 
         if (proc.getExitCode() != 0)
         {
             emit errorMessage(
                 QObject::tr("Failed to copy '%1' over to the remote machine! "
-                            "Diagnostic info:\n%1").arg(localPath).arg(proc.getDiagnosticInfo())
+                            "Diagnostic info:\n%2").arg(localPath).arg(proc.getDiagnosticInfo())
             );
 
             mCancelRequested = true;

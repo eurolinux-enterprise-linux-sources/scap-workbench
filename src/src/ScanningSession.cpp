@@ -29,11 +29,13 @@ extern "C" {
 #include <xccdf_session.h>
 #include <scap_ds.h>
 #include <oscap.h>
+#include <oscap_error.h>
 }
 
 #include <cassert>
 #include <ctime>
 #include <QFileInfo>
+#include <QBuffer>
 #include <QXmlQuery>
 #include <QXmlItem>
 #include <QXmlResultItems>
@@ -43,6 +45,7 @@ ScanningSession::ScanningSession():
     mSession(0),
     mTailoring(0),
 
+    mSkipValid(false),
     mSessionDirty(false),
     mTailoringUserChanges(false)
 {
@@ -52,6 +55,14 @@ ScanningSession::ScanningSession():
 ScanningSession::~ScanningSession()
 {
     closeFile();
+}
+
+void ScanningSession::setSkipValid(bool skipValid)
+{
+    mSkipValid = skipValid;
+
+    if (mSession)
+        xccdf_session_set_validation(mSession, mSkipValid, false);
 }
 
 struct xccdf_session* ScanningSession::getXCCDFSession() const
@@ -69,11 +80,13 @@ void ScanningSession::openFile(const QString& path)
 
     // We have to make sure that we *ALWAYS* open the session by absolute
     // path. oscap local won't be run from the same directory from where
-    // scap-workbench is run
+    // SCAP Workbench is run
     mSession = xccdf_session_new(pathInfo.absoluteFilePath().toUtf8().constData());
     if (!mSession)
         throw ScanningSessionException(
             QString("Failed to create session for '%1'. OpenSCAP error message:\n%2").arg(path).arg(oscapErrDesc()));
+
+    xccdf_session_set_validation(mSession, mSkipValid, false);
 
     mSessionDirty = true;
     mTailoringUserChanges = false;
@@ -113,19 +126,27 @@ inline void getDependencyClosureOfFile(const QString& filePath, QSet<QString>& t
     targetSet.insert(fileInfo.absoluteFilePath()); // insert current file
     QDir parentDir = fileInfo.dir();
 
-    oscap_document_type_t docType;
-    if (oscap_determine_document_type(filePath.toUtf8().constData(), &docType) != 0)
+    struct oscap_source* source = oscap_source_new_from_file(filePath.toUtf8().constData());
+
+    oscap_document_type_t docType = oscap_source_get_scap_type(source);
+
+    if (docType == OSCAP_DOCUMENT_UNKNOWN)
         return;
 
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    char* rawBuffer;
+    size_t rawSize;
+    if (oscap_source_get_raw_memory(source, &rawBuffer, &rawSize) != 0)
         throw ScanningSessionException(QString(
-            "Can't open file '%1' when calculating opened files closure.").arg(filePath));
+            "Can't get raw data of file '%1' when calculating opened files closure.").arg(filePath));
+
+    QBuffer buffer;
+    buffer.setData(rawBuffer, rawSize);
+    free(rawBuffer);
 
     if (docType == OSCAP_DOCUMENT_XCCDF)
     {
         QXmlQuery depQuery;
-        depQuery.setFocus(&file);
+        depQuery.setFocus(&buffer);
         depQuery.setQuery("//*[local-name() = 'check-content-ref']/@href");
 
         if (depQuery.isValid())
@@ -290,7 +311,7 @@ QString ScanningSession::getDatastreamID() const
         throw ScanningSessionException(
             "Can't get datastream ID in scanning session unless opened file is a source datastream");
 
-    return xccdf_session_get_datastream_id(mSession);
+    return QString::fromUtf8(xccdf_session_get_datastream_id(mSession));
 }
 
 void ScanningSession::setComponentID(const QString& componentID)
@@ -313,7 +334,7 @@ QString ScanningSession::getComponentID() const
         throw ScanningSessionException(
             "Can't get component ID in scanning session unless opened file is a source datastream");
 
-    return xccdf_session_get_component_id(mSession);
+    return QString::fromUtf8(xccdf_session_get_component_id(mSession));
 }
 
 QString ScanningSession::getBenchmarkTitle() const
@@ -323,8 +344,9 @@ QString ScanningSession::getBenchmarkTitle() const
 
     struct xccdf_policy_model* pmodel = xccdf_session_get_policy_model(mSession);
     struct xccdf_benchmark* benchmark = xccdf_policy_model_get_benchmark(pmodel);
+    struct xccdf_policy* policy= xccdf_session_get_xccdf_policy(mSession);
 
-    return oscapTextIteratorGetPreferred(xccdf_benchmark_get_title(benchmark));
+    return oscapItemGetReadableTitle(xccdf_benchmark_to_item(benchmark), policy);
 }
 
 void ScanningSession::resetTailoring()
@@ -332,10 +354,16 @@ void ScanningSession::resetTailoring()
     if (!fileOpened())
         return;
 
-    xccdf_session_set_user_tailoring_cid(mSession, 0);
-    xccdf_session_set_user_tailoring_file(mSession, 0);
-
     mTailoring = 0;
+
+    // nothing to reset if these conditions are met
+    if (!mTailoringUserChanges && mUserTailoringCID.isEmpty() && mUserTailoringFile.isEmpty())
+        return;
+
+    xccdf_session_set_user_tailoring_cid(mSession, 0);
+    mUserTailoringCID = "";
+    xccdf_session_set_user_tailoring_file(mSession, 0);
+    mUserTailoringFile = "";
 
     mSessionDirty = true;
     mTailoringUserChanges = false;
@@ -346,10 +374,16 @@ void ScanningSession::setTailoringFile(const QString& tailoringFile)
     if (!fileOpened())
         return;
 
-    xccdf_session_set_user_tailoring_cid(mSession, 0);
-    xccdf_session_set_user_tailoring_file(mSession, tailoringFile.toUtf8().constData());
-
     mTailoring = 0;
+
+    // nothing to change if these conditions are met
+    if (!mTailoringUserChanges && mUserTailoringCID.isEmpty() && mUserTailoringFile == tailoringFile)
+        return;
+
+    xccdf_session_set_user_tailoring_cid(mSession, 0);
+    mUserTailoringCID = "";
+    xccdf_session_set_user_tailoring_file(mSession, tailoringFile.toUtf8().constData());
+    mUserTailoringFile = tailoringFile;
 
     mSessionDirty = true;
     mTailoringUserChanges = false;
@@ -360,10 +394,16 @@ void ScanningSession::setTailoringComponentID(const QString& componentID)
     if (!fileOpened())
         return;
 
-    xccdf_session_set_user_tailoring_file(mSession, 0);
-    xccdf_session_set_user_tailoring_cid(mSession, componentID.toUtf8().constData());
-
     mTailoring = 0;
+
+    // nothing to change if these conditions are met
+    if (!mTailoringUserChanges && mUserTailoringCID == componentID && mUserTailoringFile.isEmpty())
+        return;
+
+    xccdf_session_set_user_tailoring_file(mSession, 0);
+    mUserTailoringFile = "";
+    xccdf_session_set_user_tailoring_cid(mSession, componentID.toUtf8().constData());
+    mUserTailoringCID = componentID;
 
     mSessionDirty = true;
     mTailoringUserChanges = false;
@@ -375,20 +415,22 @@ void ScanningSession::saveTailoring(const QString& path)
 
     if (xccdf_tailoring_get_benchmark_ref(mTailoring) == NULL)
     {
-        // we don't set the absolute path as benchmark ref to avoid revealing directory structure
-        QFileInfo fileInfo(getOpenedFilePath());
-        xccdf_tailoring_set_benchmark_ref(mTailoring, fileInfo.fileName().toUtf8().constData());
+        const QFileInfo fileInfo(getOpenedFilePath());
+        xccdf_tailoring_set_benchmark_ref(mTailoring, fileInfo.absoluteFilePath().toUtf8().constData());
     }
 
+
     struct xccdf_benchmark* benchmark = getXCCDFInputBenchmark();
+    const struct xccdf_version_info* version_info = xccdf_benchmark_get_schema_version(benchmark);
+
     if (xccdf_tailoring_export(
         mTailoring,
         path.toUtf8().constData(),
-        xccdf_benchmark_get_schema_version(benchmark)
+        version_info
     ) != 1) // 1 is actually success here, big inconsistency in openscap API :(
     {
         throw ScanningSessionException(
-            QString("Exporting tailoring to '%1' failed! Details follow:\n%2").arg(path).arg(oscapErrDesc())
+            QString("Exporting customization to '%1' failed! Details follow:\n%2").arg(path).arg(oscapErrDesc())
         );
     }
 }
@@ -403,6 +445,37 @@ QString ScanningSession::getTailoringFilePath()
 
     const QString fileName = mTailoringFile.fileName();
     saveTailoring(fileName);
+
+    return fileName;
+}
+
+void ScanningSession::generateGuide(const QString& path)
+{
+    // TODO: This does not deal with multiple datastreams inside one file!
+
+    const QByteArray profileId = getProfile().toUtf8();
+    const char* params[] = {
+        "profile_id",        profileId.constData(),
+        "template",          0,
+        "verbosity",         "",
+        "hide-profile-info", "yes",
+        0
+    };
+
+    if (oscap_apply_xslt(getOpenedFilePath().toUtf8().constData(), "xccdf-guide.xsl", path.toUtf8().constData(), params) == -1)
+        throw ScanningSessionException(QString("ScanningSession::generateGuide failed! oscap_err_desc(): %1.").arg(oscap_err_desc()));
+}
+
+QString ScanningSession::getGuideFilePath()
+{
+    if (mGuideFile.isOpen())
+        mGuideFile.close();
+
+    mGuideFile.open();
+    mGuideFile.close();
+
+    const QString fileName = mGuideFile.fileName();
+    generateGuide(fileName);
 
     return fileName;
 }
@@ -536,7 +609,7 @@ void ScanningSession::reloadSession(bool forceReload) const
     {
         if (xccdf_session_load(mSession) != 0)
             throw ScanningSessionException(
-                QString("Failed to reload session. OpenSCAP error message:\n%1").arg(oscapErrDesc()));
+                QString("Failed to reload session. OpenSCAP error message:\n%1").arg(oscapErrGetFullError()));
 
         struct xccdf_policy_model* policyModel = xccdf_session_get_policy_model(mSession);
 
@@ -595,7 +668,7 @@ struct xccdf_profile* ScanningSession::tailorCurrentProfile(bool shadowed, const
             struct oscap_text* oldTitle = oscap_text_iterator_next(titles);
             struct oscap_text* newTitle = oscap_text_clone(oldTitle);
 
-            oscap_text_set_text(newTitle, (QString::fromUtf8(oscap_text_get_text(oldTitle)) + QString(" [TAILORED]")).toUtf8().constData());
+            oscap_text_set_text(newTitle, (QString::fromUtf8(oscap_text_get_text(oldTitle)) + QString(" [CUSTOMIZED]")).toUtf8().constData());
             xccdf_profile_add_title(newProfile, newTitle);
         }
         oscap_text_iterator_free(titles);
@@ -617,7 +690,7 @@ struct xccdf_profile* ScanningSession::tailorCurrentProfile(bool shadowed, const
         {
             struct oscap_text* newTitle = oscap_text_new();
             oscap_text_set_lang(newTitle, OSCAP_LANG_ENGLISH_US);
-            oscap_text_set_text(newTitle, "(default) [TAILORED]");
+            oscap_text_set_text(newTitle, "(default) [CUSTOMIZED]");
             xccdf_profile_add_title(newProfile, newTitle);
         }
         {

@@ -26,7 +26,9 @@ Scanner::Scanner():
     mScannerMode(SM_SCAN),
     mScanThread(0),
     mMainThread(0),
+    mDryRun(false),
     mSkipValid(false),
+    mFetchRemoteResources(false),
     mSession(0),
     mTarget("")
 {}
@@ -44,6 +46,11 @@ void Scanner::setMainThread(QThread* thread)
     mMainThread = thread;
 }
 
+void Scanner::setDryRun(bool dryRun)
+{
+    mDryRun = dryRun;
+}
+
 void Scanner::setSkipValid(bool skip)
 {
     mSkipValid = skip;
@@ -52,6 +59,16 @@ void Scanner::setSkipValid(bool skip)
 bool Scanner::getSkipValid() const
 {
     return mSkipValid;
+}
+
+void Scanner::setFetchRemoteResources(bool fetch)
+{
+    mFetchRemoteResources = fetch;
+}
+
+bool Scanner::getFetchRemoteResources() const
+{
+    return mFetchRemoteResources;
 }
 
 void Scanner::setSession(ScanningSession* session)

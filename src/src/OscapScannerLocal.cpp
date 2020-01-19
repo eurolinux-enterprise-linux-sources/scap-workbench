@@ -40,8 +40,52 @@ OscapScannerLocal::OscapScannerLocal():
 OscapScannerLocal::~OscapScannerLocal()
 {}
 
+QStringList OscapScannerLocal::getCommandLineArgs() const
+{
+    QStringList args("oscap");
+
+    if (mScannerMode == SM_OFFLINE_REMEDIATION)
+    {
+        QTemporaryFile inputARFFile;
+        inputARFFile.setAutoRemove(true);
+        inputARFFile.open();
+        inputARFFile.write(getARFForRemediation());
+        inputARFFile.close();
+
+        args += buildOfflineRemediationArgs(inputARFFile.fileName(),
+            "/tmp/xccdf-results.xml",
+            "/tmp/report.html",
+            "/tmp/arf.xml",
+            // ignore capabilities because of dry-run
+            true
+        );
+    }
+    else
+    {
+        args += buildEvaluationArgs(mSession->getOpenedFilePath(),
+            mSession->hasTailoring() ? mSession->getTailoringFilePath() : QString(),
+            "/tmp/xccdf-results.xml",
+            "/tmp/report.html",
+            "/tmp/arf.xml",
+            mScannerMode == SM_SCAN_ONLINE_REMEDIATION,
+            // ignore capabilities because of dry-run
+            true
+        );
+    }
+
+    args.removeOne("--progress");
+
+    return args;
+}
+
 void OscapScannerLocal::evaluate()
 {
+    if (mDryRun)
+    {
+        signalCompletion(mCancelRequested);
+        return;
+    }
+
     emit infoMessage(QObject::tr("Querying capabilities..."));
 
     {
@@ -123,14 +167,15 @@ void OscapScannerLocal::evaluate()
                 mScannerMode == SM_SCAN_ONLINE_REMEDIATION);
     }
 
-#if SCAP_WORKBENCH_OSCAP_LOCAL_NICENESS != 0
+    QString program = "";
+#ifdef SCAP_WORKBENCH_LOCAL_NICE_FOUND
     args.prepend(getPkexecOscapPath());
-    args.prepend(QString::number(SCAP_WORKBENCH_OSCAP_LOCAL_NICENESS));
+    args.prepend(QString::number(SCAP_WORKBENCH_LOCAL_OSCAP_NICENESS));
     args.prepend("-n");
 
-    const QString program = SCAP_WORKBENCH_LOCAL_NICE_PATH;
+    program = SCAP_WORKBENCH_LOCAL_NICE_PATH;
 #else
-    const QString program = getPkexecOscapPath();
+    program = getPkexecOscapPath();
 #endif
 
     process.start(program, args);

@@ -66,6 +66,11 @@ class TailoringWindow : public QMainWindow
         void setItemSelected(struct xccdf_item* xccdfItem, bool selected);
 
         /**
+         * @brief Synchronizes the profile item with the profile
+         */
+        void synchronizeProfileItem();
+
+        /**
          * @brief Synchronizes given tree item to represent given XCCDF item
          *
          * @param recursive If true synchronization is called on children of the tree item and XCCDF item as well
@@ -75,8 +80,14 @@ class TailoringWindow : public QMainWindow
         void setValueValue(struct xccdf_value* xccdfValue, const QString& newValue);
         void refreshXccdfItemPropertiesDockWidget();
 
+        struct xccdf_item* getXCCDFItemById(const QString& id) const;
+
+        void changeSelectionToXCCDFItemById(const QString& id);
+
         QString getCurrentValueValue(struct xccdf_value* xccdfValue);
         void setValueValueWithUndoCommand(struct xccdf_value* xccdfValue, const QString& newValue);
+
+        const std::vector<struct xccdf_rule*>& getRulesAffectedByValue(struct xccdf_value* xccdfValue) const;
 
     public slots:
         /**
@@ -152,13 +163,18 @@ class TailoringWindow : public QMainWindow
         void confirmAndClose();
         void deleteProfileAndDiscard();
 
-    private:
+    protected:
         /// Reimplemented to refresh profiles and selected rules in the parent main window
-        virtual void closeEvent(QCloseEvent * event);
+        virtual void closeEvent(QCloseEvent* event);
 
+    private:
         QString getQSettingsKey() const;
         void deserializeCollapsedItems();
         void serializeCollapsedItems();
+
+        /// Internal usage only, this method assumes serializeCollapsedItems was called recently
+        void removeOldCollapsedLists();
+
         void syncCollapsedItems();
         void syncCollapsedItem(QTreeWidgetItem* item, QSet<QString>& usedCollapsedIds);
 
@@ -174,12 +190,18 @@ class TailoringWindow : public QMainWindow
         /// UI designed in Qt Designer
         Ui_TailoringWindow mUI;
 
+        /// The root profile item in the tree (profile isn't an xccdf_item!)
+        QTreeWidgetItem* mProfileItem;
+        /// The root benchmark item in the tree
+        QTreeWidgetItem* mBenchmarkItem;
+
         XCCDFItemPropertiesDockWidget* mItemPropertiesDockWidget;
         ProfilePropertiesDockWidget* mProfilePropertiesDockWidget;
         QDockWidget* mUndoViewDockWidget;
 
         QLineEdit* mSearchBox;
         QPushButton* mSearchButton;
+        QLabel* mSearchFeedback;
 
         struct xccdf_policy* mPolicy;
         struct xccdf_profile* mProfile;
@@ -192,6 +214,11 @@ class TailoringWindow : public QMainWindow
 
         unsigned int mSearchSkippedItems;
         QString mSearchCurrentNeedle;
+
+        void generateValueAffectsRulesMap(struct xccdf_item* item);
+
+        typedef std::map<struct xccdf_value*, std::vector<struct xccdf_rule*> > ValueAffectsRulesMap;
+        ValueAffectsRulesMap mValueAffectsRulesMap;
 
     private slots:
         void searchNext();

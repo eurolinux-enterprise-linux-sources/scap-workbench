@@ -33,6 +33,7 @@ class OscapScannerLocal : public OscapScannerBase
         OscapScannerLocal();
         virtual ~OscapScannerLocal();
 
+        virtual QStringList getCommandLineArgs() const;
         virtual void evaluate();
 
     private:
